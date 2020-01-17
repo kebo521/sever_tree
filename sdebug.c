@@ -4,7 +4,7 @@
 #include "comm.h"
 
 
-
+#if(0)
 
 #define abs(a)  ((a) < 0 ?  -(a) :(a))
 #define is_digit(c) ((c) >= '0' && (c) <= '9')
@@ -193,7 +193,7 @@ static char * iaddr(char *str, unsigned char *addr, int size, int precision, int
     return str;
 }
 
-int _vsprintf(char *buf, const char *fmt, va_list args)
+int _vsprintf(char *buf, const char *fmt, _va_list args)
 {
     char *str;
     int field_width;      /* Width of output field */
@@ -411,6 +411,7 @@ int _vsprintf(char *buf, const char *fmt, va_list args)
     *str = '\0';
     return str - buf;
 }
+#endif
 
 void gTrace(const char *format,...)
 {	
