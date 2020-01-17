@@ -36,6 +36,9 @@
 #define DEBUG_BUFF_MAX 	(8*1024)
 #define DEBUG_DATE_LEN 	(21)
 
+//typedef void *(*pthreadFuntion)(void *); 
+
+
 typedef struct
 {
 	int client_times;
@@ -297,8 +300,7 @@ void* Handle_6666Sever(void* pFd)
 		}
 		tSockData.client_times ++ ;
 		/* send/recv */
-		
-		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_StrSwap,&tSockData))
+		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_StrSwap,&tSockData))	//(void * (*)(void *))
 		{
 			close(tSockData.new_fd);
 			fprintf(stderr,"pthread_create error:%sna \r\n", strerror(errno)); 
@@ -310,6 +312,7 @@ void* Handle_6666Sever(void* pFd)
 	exit( 0); 
 }
 
+
 void* Handle_8888Sever(void* pFd)
 {
 	/* socket->bind->listen->accept->send/recv->close*/
@@ -319,7 +322,7 @@ void* Handle_8888Sever(void* pFd)
 	//struct sockaddr_in client_addr;
 	socklen_t addr_len; 
 	pthread_t threadID;
-	TRACE("Handle 8888Sever[%d]",*(int*)pFd);
+	TRACE("Handle 8888Sever");
 	tSockData.client_times = 0;	
 	/* socket->bind->listen->accept->send/recv->close*/
 
@@ -411,8 +414,8 @@ int main(int argc, char* argv[])
 			if (fd > 2) close(fd);
 		}
 	}
-
 	signal(SIGCHLD,SIG_IGN); 
+	
 	ret=pthread_create(&t6ID,NULL,&Handle_6666Sever,NULL);
 	TRACE("create Handle 6666Sever[%d],id[%d]",ret,t6ID);
 	if(ret)
@@ -425,9 +428,11 @@ int main(int argc, char* argv[])
 	{
 		fprintf(stderr,"pthread8create[%d] error:%sna \r\n",ret, strerror(errno)); 
 	}
+	
 	/* 等待线程pthread释放 */
-	pthread_join(t6ID, NULL);
 	pthread_join(t8ID, NULL);
+	pthread_join(t6ID, NULL);
+	
 	exit( 0); 
 }
 
