@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
 	pthread_t t6ID,t8ID;
 	int ret;
 	{
-		char buff[24];
+		char buff[20];
 		OsGetTimeStr(buff);
 		TRACE("In Main argv[%s]-[%s]",argv[0],buff);
 	}	

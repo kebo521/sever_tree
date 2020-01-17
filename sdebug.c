@@ -517,7 +517,12 @@ int gLogHex(char* sbuff,int size,char *pTitle,u8 *pBcd, int len)
 	{
 		return snprintf(sbuff,size,"TRACE_HEX-->> %s:Data[%d]=NULL\r\n",pTitle,len);
 	}
-	len1 = sprintf(sbuff,"%s[%d]:\r\n",pTitle,len);
+	len1 = sprintf(sbuff,"%s[%d]:",pTitle,len);
+	if(len > 20)
+	{
+		sbuff[len1++]='\r';
+		sbuff[len1++]='\n';
+	}
 	len2 = gBcdtoStr_n(pBcd,len,sbuff+len1,size-len1);
 	return (len1+len2);
 }
