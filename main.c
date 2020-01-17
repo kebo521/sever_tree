@@ -48,17 +48,11 @@ typedef struct
 
 int OsGetTimeStr(char *pOutStr)
 {
-/*
-	timespec time;
-	struct tm tblock;
-	clock_gettime(CLOCK_REALTIME, &time); //获取相对于1970到现在的秒数
-	localtime_r(&time.tv_sec, &tblock);
-*/
 	time_t timer;//long
 	struct tm *pblock;
 	timer = time(NULL);
 	pblock = localtime(&timer);
-	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
+	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon+1,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
 }
 
 void* EXP_LenSwap(def_sockdata* pFd)
@@ -385,8 +379,11 @@ int main(int argc, char* argv[])
 	/* socket->bind->listen->accept->send/recv->close*/
 	pthread_t t6ID,t8ID;
 	int ret;
-	TRACE("In Main argv[%s]",argv[0]);
-	
+	{
+		char buff[24];
+		OsGetTimeStr(buff);
+		TRACE("In Main argv[%s]-[%s]",argv[0],buff);
+	}	
 	{
 		int fd;
 		/*

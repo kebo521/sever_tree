@@ -500,16 +500,14 @@ void gTraceHex(char *pTitle,u8 *pBcd, int len)
 }
 
 
-
 int gLog(char* sbuff,int size,const char *format,...)
 {	
-	va_list arg;
 	int ret;
-	va_start(arg, format );
-	memcpy(sbuff,"TRACE->>",8);
-	ret=vsnprintf(sbuff+8,size-8,format,arg);
+	va_list arg;
+	va_start(arg, format);
+	ret=vsnprintf(sbuff,size,format,arg);
 	va_end(arg);
-	return ret+8;
+	return ret;
 }
 
 int gLogHex(char* sbuff,int size,char *pTitle,u8 *pBcd, int len)
