@@ -32,4 +32,9 @@ extern void gTraceHex(char *pTitle,u8 *pBcd, int len);
 #define TRACE(...) 				gTrace(__VA_ARGS__)
 #define TRACE_HEX(Msg,buf,len) 	gTraceHex(Msg,buf,len)
 
+
+extern int gLog(char* sbuff,int size,const char *format,...);
+extern int gLogHex(char* sbuff,int size,char *pTitle,u8 *pBcd, int len);
+
+
 #endif

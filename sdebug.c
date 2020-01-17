@@ -501,4 +501,28 @@ void gTraceHex(char *pTitle,u8 *pBcd, int len)
 
 
 
+int gLog(char* sbuff,int size,const char *format,...)
+{	
+	va_list arg;
+	int ret;
+	va_start(arg, format );
+	memcpy(sbuff,"TRACE->>",8);
+	ret=vsnprintf(sbuff+8,size-8,format,arg);
+	va_end(arg);
+	return ret+8;
+}
+
+int gLogHex(char* sbuff,int size,char *pTitle,u8 *pBcd, int len)
+{
+	int len1,len2;
+	if(pBcd == NULL )
+	{
+		return snprintf(sbuff,size,"TRACE_HEX-->> %s:Data[%d]=NULL\r\n",pTitle,len);
+	}
+	len1 = sprintf(sbuff,"%s[%d]:\r\n",pTitle,len);
+	len2 = gBcdtoStr_n(pBcd,len,sbuff+len1,size-len1);
+	return (len1+len2);
+}
+
+
 

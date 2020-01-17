@@ -33,7 +33,15 @@
 
 #define RECV_BUFF_MAX 	(8*1024)
 #define SEND_BUFF_MAX 	(8*1024)
+#define DEBUG_BUFF_MAX 	(8*1024)
+#define DEBUG_DATE_LEN 	(21)
 
+typedef struct
+{
+	int client_times;
+	int new_fd; 
+	struct sockaddr_in client;
+}def_sockdata;
 
 int OsGetTimeStr(char *pOutStr)
 {
@@ -50,19 +58,32 @@ int OsGetTimeStr(char *pOutStr)
 	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
 }
 
-void* EXP_LenSwap(void* pFd)
+void* EXP_LenSwap(def_sockdata* pFd)
 {
-	int new_fd = *(int*)pFd; 
+	int new_fd = pFd->new_fd;
 	int ret,offset;
-	int len;
-	char *pRecvBuff,*pSendBuff,*pBuff;
+	int len,offLog;
+	char *pRecvBuff,*pSendBuff,*plogBuff,*pBuff;
 	struct timeval timeout; 
-	pBuff = (char*)malloc(RECV_BUFF_MAX+SEND_BUFF_MAX);
+	pBuff = (char*)malloc(RECV_BUFF_MAX+SEND_BUFF_MAX+DEBUG_BUFF_MAX);
 	pRecvBuff = pBuff;
 	pSendBuff = pBuff + RECV_BUFF_MAX;
+	plogBuff = pSendBuff + SEND_BUFF_MAX;
+	//----------------------------------------------------------------------------------------------
+	offLog=gLog(plogBuff+DEBUG_DATE_LEN,DEBUG_BUFF_MAX-DEBUG_DATE_LEN,"->Len8 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
+		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
+	offLog += gLogHex(plogBuff+DEBUG_DATE_LEN+offLog,DEBUG_BUFF_MAX-DEBUG_DATE_LEN-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
+	{
+		char datetime[20];
+		OsGetTimeStr(datetime);
+		//---DEBUG_DATE_LEN-----
+		plogBuff[0]='\r';
+		plogBuff[1]='\n';
+		memcpy(plogBuff+2,datetime,DEBUG_DATE_LEN-2);
+	}
+	//----------------------------------------------------------------------------------------------
 	timeout.tv_sec = 30;
 	timeout.tv_usec = 0;
-	TRACE("StrSwap fd[%d]",new_fd);
 	while(1)
 	{ 
 		//设置接收超时
@@ -98,7 +119,7 @@ void* EXP_LenSwap(void* pFd)
 		{
 			EXP_UNIT *pUnit;
 			char *p=pRecvBuff;
-			TRACE_HEX("pRecvBuff",(u8*)pRecvBuff,len);
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"l->RecvBuff",(u8*)pRecvBuff,len);
 			pUnit=EXP_StrALL(&p,p+len);
 			offset = 2;
 			while(pUnit)
@@ -126,51 +147,66 @@ void* EXP_LenSwap(void* pFd)
 			EXP_FreeUNIT(pUnit,0);
 			pSendBuff[0]=(offset-2)/256;
 			pSendBuff[1]=(offset-2)&0xff;
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"l->SendBuff",(u8*)pSendBuff,offset);
 			send(new_fd, pSendBuff, offset, 0); 
 			//Trace_PutMsg(pUnit);
 		}
 		else break;
 	}
+	plogBuff[offLog]='\0'; puts(plogBuff);
+	
 	free(pBuff);
 	close(new_fd); 
 	return NULL; 
 }
 
 
-void* EXP_StrSwap(void* pFd)
+void* EXP_StrSwap(def_sockdata* pFd)
 {
-	int new_fd = *(int*)pFd; 
+	int new_fd = pFd->new_fd;
 	int ret,offset;
-	char *pRecvBuff,*pSendBuff,*pBuff;
+	int offLog;
+	char *pRecvBuff,*pSendBuff,*plogBuff,*pBuff;
 	struct timeval timeout; 
-	pBuff = (char*)malloc(RECV_BUFF_MAX+SEND_BUFF_MAX);
+	pBuff = (char*)malloc(RECV_BUFF_MAX+SEND_BUFF_MAX+DEBUG_BUFF_MAX);
 	pRecvBuff = pBuff;
 	pSendBuff = pBuff + RECV_BUFF_MAX;
+	plogBuff = pSendBuff + SEND_BUFF_MAX;
+	//----------------------------------------------------------------------------------------------
+	offLog=gLog(plogBuff+DEBUG_DATE_LEN,DEBUG_BUFF_MAX-DEBUG_DATE_LEN,"->Str6 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
+		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
+	offLog += gLogHex(plogBuff+DEBUG_DATE_LEN+offLog,DEBUG_BUFF_MAX-DEBUG_DATE_LEN-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
+	{
+		char datetime[20];
+		OsGetTimeStr(datetime);
+		//---DEBUG_DATE_LEN-----
+		plogBuff[0]='\r';
+		plogBuff[1]='\n';
+		memcpy(plogBuff+2,datetime,DEBUG_DATE_LEN-2);
+	}
+	//----------------------------------------------------------------------------------------------	
 	timeout.tv_sec = 30;
 	timeout.tv_usec = 0;
-	TRACE("StrSwap fd[%d]",new_fd);
 	while(1)
 	{ 
 		//设置接收超时
 		setsockopt(new_fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout)); 
 		/* recv */
-		offset = 0;
-		while(1)
-		{
-			ret = recv(new_fd, pRecvBuff+offset, RECV_BUFF_MAX-offset, 0); 
-			if(ret <= 0)
-			{ 
-				fprintf(stderr,"fd[%d] recvn[%d] error:%sna\r\n",new_fd,offset, strerror(errno)); 
-				break;
-			}
-			offset += ret;
-			usleep(5*1000);
+		offset = recv(new_fd, pRecvBuff, RECV_BUFF_MAX, 0); 
+		if(offset <= 0)
+		{ 
+			fprintf(stderr,"fd[%d] recvn[%d] error:%sna\r\n",new_fd,offset, strerror(errno)); 
+			break;
 		}
+	
 		if(offset > 2)
 		{
 			EXP_UNIT *pUnit;
 			char *p=pRecvBuff;
-			TRACE_HEX("pRecvBuff",(u8*)pRecvBuff,offset);
+			
+			pRecvBuff[offset]='\0';
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"s->RecvBuff[%s]",pRecvBuff);
+			
 			pUnit=EXP_StrALL(&p,p+offset);
 			offset = 0;
 			while(pUnit)
@@ -196,11 +232,13 @@ void* EXP_StrSwap(void* pFd)
 				pUnit=pUnit->pNext;
 			}
 			EXP_FreeUNIT(pUnit,0);
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"s->SendBuff[%s]",pSendBuff);
 			send(new_fd, pSendBuff, offset+1, 0); 
 			//Trace_PutMsg(pUnit);
 		}
 		else break;
 	}
+	plogBuff[offLog]='\0'; puts(plogBuff);
 	free(pBuff);
 	close(new_fd); 
 	return NULL; 
@@ -209,15 +247,14 @@ void* EXP_StrSwap(void* pFd)
 void* Handle_6666Sever(void* pFd)
 {
 	/* socket->bind->listen->accept->send/recv->close*/
-	int sock_fd, new_fd; 
+	int sock_fd; 
 	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;
+	def_sockdata tSockData;
 	//struct sockaddr_in client_addr;
 	socklen_t addr_len; 
 	pthread_t threadID;
-	int client_num = 0; 
-	TRACE("Handle 6666Sever\r\n");
-	
+	TRACE("Handle 6666Sever");
+	tSockData.client_times = 0;
 	/* socket->bind->listen->accept->send/recv->close*/
 
 	/* socket */
@@ -251,25 +288,19 @@ void* Handle_6666Sever(void* pFd)
 	while( 1) 
 	{ 
 		addr_len = sizeof(struct sockaddr); 
-		new_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_len); //(struct sockaddr *)
-		if( -1 == new_fd) 
+		tSockData.new_fd = accept(sock_fd, (struct sockaddr *)&tSockData.client, &addr_len); //(struct sockaddr *)
+		if( -1 == tSockData.new_fd) 
 		{ 
 			fprintf( stderr, "accept error:%sna", strerror(errno)); 
 			close(sock_fd); 
 			exit( 1); 
-		} 
-		client_num++; 
-		{
-			char datetime[24];
-			OsGetTimeStr(datetime);
-			TRACE("Server[%s]connet[%d]times[%d] sa[%d]Addr[%x,%d]",datetime,new_fd,client_num, \
-				client_addr.sin_family,client_addr.sin_addr.s_addr,client_addr.sin_port);
-			TRACE_HEX("sa_data",(u8*)client_addr.sin_zero,sizeof(client_addr.sin_zero));
 		}
+		tSockData.client_times ++ ;
 		/* send/recv */
-		if(pthread_create(&threadID,NULL,&EXP_StrSwap,&new_fd))
+		
+		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_StrSwap,&tSockData))
 		{
-			close(new_fd);
+			close(tSockData.new_fd);
 			fprintf(stderr,"pthread_create error:%sna \r\n", strerror(errno)); 
 			continue;
 		}
@@ -282,15 +313,14 @@ void* Handle_6666Sever(void* pFd)
 void* Handle_8888Sever(void* pFd)
 {
 	/* socket->bind->listen->accept->send/recv->close*/
-	int sock_fd, new_fd; 
+	int sock_fd; 
 	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;
+	def_sockdata tSockData;
 	//struct sockaddr_in client_addr;
 	socklen_t addr_len; 
 	pthread_t threadID;
-	int client_num = 0; 
-	TRACE("Handle 8888Sever\r\n");
-	
+	TRACE("Handle 8888Sever[%d]",*(int*)pFd);
+	tSockData.client_times = 0;	
 	/* socket->bind->listen->accept->send/recv->close*/
 
 	/* socket */
@@ -324,25 +354,18 @@ void* Handle_8888Sever(void* pFd)
 	while( 1) 
 	{ 
 		addr_len = sizeof(struct sockaddr); 
-		new_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_len); //(struct sockaddr *)
-		if( -1 == new_fd) 
+		tSockData.new_fd = accept(sock_fd, (struct sockaddr *)&tSockData.client, &addr_len); //(struct sockaddr *)
+		if( -1 == tSockData.new_fd) 
 		{ 
 			fprintf( stderr, "accept error:%sna", strerror(errno)); 
 			close(sock_fd); 
 			exit( 1); 
 		} 
-		client_num++; 
-		{
-			char datetime[24];
-			OsGetTimeStr(datetime);
-			TRACE("Server[%s]connet[%d]times[%d] sa[%d]Addr[%x,%d]",datetime,new_fd,client_num, \
-				client_addr.sin_family,client_addr.sin_addr.s_addr,client_addr.sin_port);
-			TRACE_HEX("sa_data",(u8*)client_addr.sin_zero,sizeof(client_addr.sin_zero));
-		}
+		tSockData.client_times++; 
 		/* send/recv */
-		if(pthread_create(&threadID,NULL,&EXP_LenSwap,&new_fd))
+		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_LenSwap,&tSockData))
 		{
-			close(new_fd);
+			close(tSockData.new_fd);
 			fprintf(stderr,"pthread_create error:%sna \r\n", strerror(errno)); 
 			continue;
 		}
@@ -360,9 +383,10 @@ int main(int argc, char* argv[])
 	pthread_t t6ID,t8ID;
 	int ret;
 	TRACE("In Main argv[%s]",argv[0]);
-	/*
+	
 	{
 		int fd;
+		/*
 		char sName[64],datetime[24];
 		GetDateTimeStr(datetime);
 		sprintf(sName,"err%s.log",datetime);
@@ -379,7 +403,7 @@ int main(int argc, char* argv[])
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
 		}
-		
+		*/
 		fd = open("/dev/null", O_RDWR, 0);
 		if (fd != -1)
 		{
@@ -387,7 +411,7 @@ int main(int argc, char* argv[])
 			if (fd > 2) close(fd);
 		}
 	}
-*/
+
 	signal(SIGCHLD,SIG_IGN); 
 	ret=pthread_create(&t6ID,NULL,&Handle_6666Sever,NULL);
 	TRACE("create Handle 6666Sever[%d],id[%d]",ret,t6ID);
