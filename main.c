@@ -67,9 +67,10 @@ void* EXP_LenSwap(def_sockdata* pFd)
 	pSendBuff = pBuff + RECV_BUFF_MAX;
 	plogBuff = pSendBuff + SEND_BUFF_MAX;
 	//----------------------------------------------------------------------------------------------
-	offLog=gLog(plogBuff+DEBUG_DATE_LEN,DEBUG_BUFF_MAX-DEBUG_DATE_LEN,"->Len8 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
+	offLog = DEBUG_DATE_LEN;
+	offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"->Len8 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
 		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
-	offLog += gLogHex(plogBuff+DEBUG_DATE_LEN+offLog,DEBUG_BUFF_MAX-DEBUG_DATE_LEN-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
+	offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
 	{
 		char datetime[20];
 		OsGetTimeStr(datetime);
@@ -116,7 +117,7 @@ void* EXP_LenSwap(def_sockdata* pFd)
 		{
 			EXP_UNIT *pUnit;
 			char *p=pRecvBuff;
-			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"l->RecvBuff",(u8*)pRecvBuff,len);
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->RecvBuff",(u8*)pRecvBuff,len);
 			pUnit=EXP_StrALL(&p,p+len);
 			offset = 2;
 			while(pUnit)
@@ -144,7 +145,7 @@ void* EXP_LenSwap(def_sockdata* pFd)
 			EXP_FreeUNIT(pUnit,0);
 			pSendBuff[0]=(offset-2)/256;
 			pSendBuff[1]=(offset-2)&0xff;
-			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"l->SendBuff",(u8*)pSendBuff,offset);
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->SendBuff",(u8*)pSendBuff,offset);
 			send(new_fd, pSendBuff, offset, 0); 
 			//Trace_PutMsg(pUnit);
 		}
@@ -170,9 +171,10 @@ void* EXP_StrSwap(def_sockdata* pFd)
 	pSendBuff = pBuff + RECV_BUFF_MAX;
 	plogBuff = pSendBuff + SEND_BUFF_MAX;
 	//----------------------------------------------------------------------------------------------
-	offLog=gLog(plogBuff+DEBUG_DATE_LEN,DEBUG_BUFF_MAX-DEBUG_DATE_LEN,"->Str6 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
+	offLog = DEBUG_DATE_LEN;
+	offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"->Str6 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
 		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
-	offLog += gLogHex(plogBuff+DEBUG_DATE_LEN+offLog,DEBUG_BUFF_MAX-DEBUG_DATE_LEN-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
+	offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
 	{
 		char datetime[20];
 		OsGetTimeStr(datetime);
@@ -202,7 +204,7 @@ void* EXP_StrSwap(def_sockdata* pFd)
 			char *p=pRecvBuff;
 			
 			pRecvBuff[offset]='\0';
-			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"s->RecvBuff[%s]",pRecvBuff);
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->RecvBuff:%s\r\n",pRecvBuff);
 			
 			pUnit=EXP_StrALL(&p,p+offset);
 			offset = 0;
@@ -229,7 +231,7 @@ void* EXP_StrSwap(def_sockdata* pFd)
 				pUnit=pUnit->pNext;
 			}
 			EXP_FreeUNIT(pUnit,0);
-			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"s->SendBuff[%s]",pSendBuff);
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->SendBuff:%s",pSendBuff);
 			send(new_fd, pSendBuff, offset+1, 0); 
 			//Trace_PutMsg(pUnit);
 		}
@@ -383,7 +385,17 @@ int main(int argc, char* argv[])
 		char buff[20];
 		OsGetTimeStr(buff);
 		TRACE("In Main argv[%s]-[%s]",argv[0],buff);
+		/*
+		char sbuff[128];
+		int offset;
+		offset=gLog(sbuff,sizeof(sbuff),"In herr 111->\r\n");
+		offset += gLogHex(sbuff+offset,sizeof(sbuff)-offset,"buff",(u8*)buff,sizeof(buff));
+		gLog(sbuff+offset,sizeof(sbuff)-offset,"out herr OK \r\n");
+		puts(sbuff);
+		return 1;
+		*/
 	}	
+	
 	{
 		int fd;
 		/*
