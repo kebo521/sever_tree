@@ -18,6 +18,7 @@
 //#include <sys/shm.h>  
 //#include <sys/ipc.h>
 
+#include <errno.h>
 
 
 
@@ -27,7 +28,7 @@ int GetDateTimeStr(char *pOutStr)
 	struct tm *pblock;
 	timer = time(NULL);
 	pblock = localtime(&timer);
-	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
+	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon+1,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
 }
 
 void gmTrace(const char *format,...)
@@ -63,8 +64,9 @@ int main(int argc, char* argv[])
 		gmTrace("setsid failed\n");
 		return 2;
 	}
-	chdir("/");
+	
 	/*
+	chdir("/");
 	{
 		int fd;
 		fd = open ("/dev/null", O_RDWR, 0);
@@ -99,7 +101,7 @@ int main(int argc, char* argv[])
 	} 
 	//------------------孙进程------------------------------------------
 	umask(0); //应用进程权限
-	chdir("/");
+//	chdir("/");
 //	chmod("tree",0777);
 	{
 		int i;
@@ -112,7 +114,7 @@ int main(int argc, char* argv[])
 		pArgv[i]=NULL;
 		gmTrace("execv->[%s]-%X,%d\r\n",pArgv[0],pArgv[1],i);
 		i=execv(pArgv[0] ,pArgv);
-		gmTrace("execv->ret[%d]\r\n",i);
+		gmTrace("execv->ret[%d][%s]\r\n",i,strerror(errno));
 	}
 	return 0;
 //	return Handle_sever();

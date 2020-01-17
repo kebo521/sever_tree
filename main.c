@@ -260,7 +260,7 @@ void* Handle_6666Sever(void* pFd)
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET:IPV4;SOCK_STREAM:TCP
 	if( -1== sock_fd) 
 	{ 
-		fprintf( stderr, "socket error:%sna", strerror(errno)); 
+		fprintf( stderr, "socket6 error:%sna", strerror(errno)); 
 		exit( 1); 
 	} 
 	/* set server sockaddr_in */
@@ -271,14 +271,14 @@ void* Handle_6666Sever(void* pFd)
 	/* bind */
 	if( -1== bind(sock_fd, (struct sockaddr *)(&server_addr), sizeof(server_addr))) 
 	{ 
-		fprintf( stderr,"bind error:%sna \r\n", strerror(errno)); 
+		fprintf( stderr,"bind6 error:%sna \r\n", strerror(errno)); 
 		close(sock_fd); 
 		exit( 1); 
 	} 
 	/* listen */
 	if( -1 == listen(sock_fd, BACKLOG)) 
 	{ 
-		fprintf(stderr, "listen error:%sna \r\n", strerror(errno)); 
+		fprintf(stderr, "listen6 error:%sna \r\n", strerror(errno)); 
 		close(sock_fd); 
 		exit( 1); 
 	} 
@@ -290,7 +290,7 @@ void* Handle_6666Sever(void* pFd)
 		tSockData.new_fd = accept(sock_fd, (struct sockaddr *)&tSockData.client, &addr_len); //(struct sockaddr *)
 		if( -1 == tSockData.new_fd) 
 		{ 
-			fprintf( stderr, "accept error:%sna", strerror(errno)); 
+			fprintf( stderr, "accept6 error:%sna", strerror(errno)); 
 			close(sock_fd); 
 			exit( 1); 
 		}
@@ -299,7 +299,7 @@ void* Handle_6666Sever(void* pFd)
 		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_StrSwap,&tSockData))	//(void * (*)(void *))
 		{
 			close(tSockData.new_fd);
-			fprintf(stderr,"pthread_create error:%sna \r\n", strerror(errno)); 
+			fprintf(stderr,"pthread_create6 error:%sna \r\n", strerror(errno)); 
 			continue;
 		}
 	} 
@@ -326,7 +326,7 @@ void* Handle_8888Sever(void* pFd)
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET:IPV4;SOCK_STREAM:TCP
 	if( -1== sock_fd) 
 	{ 
-		fprintf( stderr, "socket error:%sna", strerror(errno)); 
+		fprintf( stderr, "socket8 error:%sna", strerror(errno)); 
 		exit( 1); 
 	} 
 	/* set server sockaddr_in */
@@ -337,14 +337,14 @@ void* Handle_8888Sever(void* pFd)
 	/* bind */
 	if( -1== bind(sock_fd, (struct sockaddr *)(&server_addr), sizeof(server_addr))) 
 	{ 
-		fprintf( stderr,"bind error:%sna \r\n", strerror(errno)); 
+		fprintf( stderr,"bind8 error:%sna \r\n", strerror(errno)); 
 		close(sock_fd); 
 		exit( 1); 
 	} 
 	/* listen */
 	if( -1 == listen(sock_fd, BACKLOG)) 
 	{ 
-		fprintf(stderr, "listen error:%sna \r\n", strerror(errno)); 
+		fprintf(stderr, "listen8 error:%sna \r\n", strerror(errno)); 
 		close(sock_fd); 
 		exit( 1); 
 	} 
@@ -356,7 +356,7 @@ void* Handle_8888Sever(void* pFd)
 		tSockData.new_fd = accept(sock_fd, (struct sockaddr *)&tSockData.client, &addr_len); //(struct sockaddr *)
 		if( -1 == tSockData.new_fd) 
 		{ 
-			fprintf( stderr, "accept error:%sna", strerror(errno)); 
+			fprintf( stderr, "accept8 error:%sna", strerror(errno)); 
 			close(sock_fd); 
 			exit( 1); 
 		} 
@@ -365,7 +365,7 @@ void* Handle_8888Sever(void* pFd)
 		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_LenSwap,&tSockData))
 		{
 			close(tSockData.new_fd);
-			fprintf(stderr,"pthread_create error:%sna \r\n", strerror(errno)); 
+			fprintf(stderr,"pthread_create8 error:%sna \r\n", strerror(errno)); 
 			continue;
 		}
 	} 
