@@ -29,10 +29,10 @@
 
 
 #define PORT_NUMBER 	8888
-#define BACKLOG 		10
+#define BACKLOG 		20
 
-#define RECV_BUFF_MAX 	(4*1024)
-#define SEND_BUFF_MAX 	(4*1024)
+#define RECV_BUFF_MAX 	(8*1024)
+#define SEND_BUFF_MAX 	(8*1024)
 
 
 int OsGetTimeStr(char *pOutStr)
@@ -62,6 +62,7 @@ void* EXP_StrSwap(void* pFd)
 	pSendBuff = pBuff + RECV_BUFF_MAX;
 	timeout.tv_sec = 30;
 	timeout.tv_usec = 0;
+	TRACE("StrSwap fd[%d]",new_fd);
 	while(1)
 	{ 
 		//设置接收超时
@@ -90,9 +91,9 @@ void* EXP_StrSwap(void* pFd)
 			}
 			offset += ret;
 			if(offset >= len) break;
-			usleep(1000);
+			usleep(10*1000);
 		}
-		
+		TRACE_HEX("pRecvBuff",(u8*)pRecvBuff,len);
 		if(len > 2)
 		{
 			EXP_UNIT *pUnit;
@@ -139,19 +140,49 @@ void* EXP_StrSwap(void* pFd)
 	return NULL; 
 }
 
-/* socket->bind->listen->accept->send/recv->close*/
-int Handle_sever(void)
-{ 
+int main(int argc, char* argv[]) 
+{
+	/* socket->bind->listen->accept->send/recv->close*/
 	int sock_fd, new_fd; 
 	struct sockaddr_in server_addr;
-	struct sockaddr client_addr;
+	struct sockaddr_in client_addr;
 	//struct sockaddr_in client_addr;
 	int ret; 
 	socklen_t addr_len; 
 	pthread_t threadID;
-	int client_num = 1; 
-
+	int client_num = 0; 
+	TRACE("In Main argv[%s]",argv[0]);
+	/*
+	{
+		int fd;
+		char sName[64],datetime[24];
+		GetDateTimeStr(datetime);
+		sprintf(sName,"err%s.log",datetime);
+		fd = open(sName, O_CREAT|O_RDWR, 0666);
+		if (fd != -1)
+		{
+			dup2(fd, STDERR_FILENO);
+			close(fd);
+		}
+		sprintf(sName,"out%s.log",datetime);
+		fd = open(sName, O_CREAT|O_RDWR, 0666);
+		if (fd != -1)
+		{
+			dup2(fd, STDOUT_FILENO);
+			close(fd);
+		}
+		
+		fd = open("/dev/null", O_RDWR, 0);
+		if (fd != -1)
+		{
+			dup2(fd, STDIN_FILENO);
+			if (fd > 2) close(fd);
+		}
+	}
+*/
 	signal(SIGCHLD,SIG_IGN); 
+	
+	/* socket->bind->listen->accept->send/recv->close*/
 
 	/* socket */
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET:IPV4;SOCK_STREAM:TCP
@@ -188,7 +219,7 @@ int Handle_sever(void)
 	while( 1) 
 	{ 
 		addr_len = sizeof(struct sockaddr); 
-		new_fd = accept(sock_fd, &client_addr, &addr_len); //(struct sockaddr *)
+		new_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_len); //(struct sockaddr *)
 		if( -1 == new_fd) 
 		{ 
 			fprintf( stderr, "accept error:%sna", strerror(errno)); 
@@ -199,8 +230,9 @@ int Handle_sever(void)
 		{
 			char datetime[24];
 			OsGetTimeStr(datetime);
-			TRACE("Server [%s]get connet times[%d] form client: %d",datetime,client_num,client_addr.sa_family);
-			TRACE_HEX("sa_data",(u8*)client_addr.sa_data,sizeof(client_addr.sa_data));
+			TRACE("Server[%s]connet[%d]times[%d] sa[%d]Addr[%x,%d]",datetime,new_fd,client_num, \
+				client_addr.sin_family,client_addr.sin_addr.s_addr,client_addr.sin_port);
+			TRACE_HEX("sa_data",(u8*)client_addr.sin_zero,sizeof(client_addr.sin_zero));
 		}
 		//fprintf(stderr, "Server get connetion form client%d: %sn", client_num, inet_ntoa(client_addr.sin_addr)); 
 		ret=pthread_create(&threadID,NULL,&EXP_StrSwap,&new_fd);
@@ -214,79 +246,6 @@ int Handle_sever(void)
 	/* close */
 	close(sock_fd); 
 	exit( 0); 
-} 
-
-
-
-int main(int argc, char* argv[]) 
-{
-//	int ret;
-	pid_t pid;
-	pid = fork();
-	if (pid < 0)
-	{
-		perror("fork");
-		return -1;
-	}
-	TRACE("1->InitProcessPool getpid[%d]fork[%d]\r\n",getpid(),pid);
-	if(pid != 0)
-		return 1;
-	pid=setsid();
-	TRACE("2->InitProcessPool getpid[%d]setsid[%d]\r\n",getpid(),pid);
-	if(pid < 0)
-	{
-		TRACE("setsid failed\n");
-		return 2;
-	}
-	
-	TRACE("Create a shared memory Init\r\n");
-	//----------------------------------------------------------------
-//	umask(0);	//子进程权限	
-	while(1) 
-	{
-		pid=fork();
-		if (pid < 0)
-		{
-			perror("fork");
-			return -2;
-		}
-		if (pid != 0)
-		{//---守护进程-------
-			pid_t _pid_t;
-			_pid_t = wait(&pid); //---等待孙进程结束------
-			printf("------reRunAPP-[%d,%d]---------\n",_pid_t,pid);
-		} 
-		else break; //孙进程，跳出外面执行
-	} 
-	//----------------------------------------------------------------
-	//umask(0); //应用进程权限
-	chdir("/");
-	{
-		int fd;
-		char sName[64],datetime[24];
-		OsGetTimeStr(datetime);
-		fd = open("/dev/null", O_RDWR, 0);
-		if (fd != -1)
-		{
-			dup2(fd, STDIN_FILENO);
-			if (fd > 2) close(fd);
-		}
-		sprintf(sName,"err%s.log",datetime);
-		fd = open(sName, O_RDWR|O_CREAT, 0666);
-		if (fd != -1)
-		{
-			dup2 (fd, STDERR_FILENO);
-			close(fd);
-		}
-		sprintf(sName,"out%s.log",datetime);
-		fd = open(sName, O_RDWR|O_CREAT, 0666);
-		if (fd != -1)
-		{
-			dup2(fd, STDOUT_FILENO);
-			close(fd);
-		}
-	}
-	return Handle_sever();
 }
 
 

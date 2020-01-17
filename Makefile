@@ -13,7 +13,7 @@ INC +=-I./gTreeFs
 LIB =-lm -lpthread
 
 all:
-	$(CC) $(INC) -g -Wall $(SRC) $(LIB) -o out/tree
+	$(CC) $(INC) -g -Wall $(SRC) $(LIB) -o run/tree
 clean:
 	rm -f bin/*
 	
