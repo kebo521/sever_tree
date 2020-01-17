@@ -689,7 +689,7 @@ EXP_UNIT* EXP_StrALL(char** pStr,char* pEnd)
 
 
 
-
+/*
 void Trace_PutMsg(EXP_UNIT* pUnit)
 {
 	while(pUnit)
@@ -750,6 +750,6 @@ int APP_Test_EXP(char *p)
 	return 0;
 }
 
-
+*/
 
 
