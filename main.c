@@ -241,19 +241,25 @@ int main(int argc, char* argv[])
 	//umask(0); //应用进程权限
 	chdir("/");
 	{
-		int fd,efb,ofb;
+		int fd;
 		fd = open("/dev/null", O_RDWR, 0);
-		efb = open("errlog", O_RDWR|O_CREAT, 0666);
-		ofb = open("outLog", O_RDWR|O_CREAT, 0666);
 		if (fd != -1)
 		{
-			dup2 (fd, STDIN_FILENO);
+			dup2(fd, STDIN_FILENO);
 			if (fd > 2) close(fd);
-			dup2 (ofb, STDOUT_FILENO);
-			dup2 (efb, STDERR_FILENO);
 		}
-		close(efb);
-		close(ofb);
+		fd = open("err.log", O_RDWR|O_CREAT, 0666);
+		if (fd != -1)
+		{
+			dup2 (fd, STDERR_FILENO);
+			close(fd);
+		}
+		fd = open("out.Log", O_RDWR|O_CREAT, 0666);
+		if (fd != -1)
+		{
+			dup2(fd, STDOUT_FILENO);
+			close(fd);
+		}
 	}
 	return Handle_sever();
 }
