@@ -35,6 +35,21 @@
 #define SEND_BUFF_MAX 	(4*1024)
 
 
+int OsGetTimeStr(char *pOutStr)
+{
+/*
+	timespec time;
+	struct tm tblock;
+	clock_gettime(CLOCK_REALTIME, &time); //获取相对于1970到现在的秒数
+	localtime_r(&time.tv_sec, &tblock);
+*/
+	time_t timer;//long
+	struct tm *pblock;
+	timer = time(NULL);
+	pblock = localtime(&timer);
+	return sprintf(pOutStr,"%04d-%02d-%02d %02d:%02d:%02d",pblock->tm_year + 1900,pblock->tm_mon,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
+}
+
 void* EXP_StrSwap(void* pFd)
 {
 	int new_fd = *(int*)pFd; 
@@ -134,7 +149,7 @@ int Handle_sever(void)
 	int ret; 
 	socklen_t addr_len; 
 	pthread_t threadID;
-	int client_num = -1; 
+	int client_num = 1; 
 
 	signal(SIGCHLD,SIG_IGN); 
 
@@ -181,6 +196,12 @@ int Handle_sever(void)
 			exit( 1); 
 		} 
 		client_num++; 
+		{
+			char datetime[24];
+			OsGetTimeStr(datetime);
+			TRACE("Server [%s]get connet times[%d] form client: %d",datetime,client_num,client_addr.sa_family);
+			TRACE_HEX("sa_data",(u8*)client_addr.sa_data,sizeof(client_addr.sa_data));
+		}
 		//fprintf(stderr, "Server get connetion form client%d: %sn", client_num, inet_ntoa(client_addr.sin_addr)); 
 		ret=pthread_create(&threadID,NULL,&EXP_StrSwap,&new_fd);
 		if(ret)
@@ -242,19 +263,23 @@ int main(int argc, char* argv[])
 	chdir("/");
 	{
 		int fd;
+		char sName[64],datetime[24];
+		OsGetTimeStr(datetime);
 		fd = open("/dev/null", O_RDWR, 0);
 		if (fd != -1)
 		{
 			dup2(fd, STDIN_FILENO);
 			if (fd > 2) close(fd);
 		}
-		fd = open("err.log", O_RDWR|O_CREAT, 0666);
+		sprintf(sName,"err%s.log",datetime);
+		fd = open(sName, O_RDWR|O_CREAT, 0666);
 		if (fd != -1)
 		{
 			dup2 (fd, STDERR_FILENO);
 			close(fd);
 		}
-		fd = open("out.Log", O_RDWR|O_CREAT, 0666);
+		sprintf(sName,"out%s.log",datetime);
+		fd = open(sName, O_RDWR|O_CREAT, 0666);
 		if (fd != -1)
 		{
 			dup2(fd, STDOUT_FILENO);
