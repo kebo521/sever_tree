@@ -1790,15 +1790,15 @@ const EXP_FunctionMatchTbl FunctionMatchTbl[] =
 	"tfsinit",			EXP_TreeFileInit,
 	"tfsrun",			EXP_TreeFileRun,
 
-	"sinit",			EXP_FileSysInit,
+	"sinit",			EXP_FileSysInit,		//() or ("123456")
 	"sdeinit",			EXP_FileSysDeinit,
-	"sopen",			EXP_FileSysOpen,
-	"swrite",			EXP_FileSysWrite,
-	"sread",			EXP_FileSysRead,
-	"sseek",			EXP_FileSysSeek,
-	"sclose",			EXP_FileSysClose,
-	"sremove",			EXP_FileSysRemove,
-	"sauto",			EXP_FileSysAutoTest
+	"sopen",			EXP_FileSysOpen,		//("path",0x103)
+	"swrite",			EXP_FileSysWrite,		//("in data")
+	"sread",			EXP_FileSysRead,		//(len)
+	"sseek",			EXP_FileSysSeek,		//(offset,wer(0,1,2))
+	"sclose",			EXP_FileSysClose,		//()
+	"sremove",			EXP_FileSysRemove,	//("path")
+	"sauto",			EXP_FileSysAutoTest	//(times)
 };
 
 #pragma GCC diagnostic pop
