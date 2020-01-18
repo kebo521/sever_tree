@@ -107,7 +107,6 @@ void* EXP_LenSwap(def_sockdata* pFd)
 	offLog = DEBUG_DATE_LEN;
 	offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"->Len8 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
 		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
-	offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
 	{
 		char datetime[20];
 		OsGetTimeStr(datetime);
@@ -192,7 +191,6 @@ void* EXP_StrSwap(def_sockdata* pFd)
 	offLog = DEBUG_DATE_LEN;
 	offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"->Str6 connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
 		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
-	offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"sa_data",(u8*)pFd->client.sin_zero,sizeof(pFd->client.sin_zero));
 	{
 		char datetime[20];
 		OsGetTimeStr(datetime);
@@ -204,10 +202,10 @@ void* EXP_StrSwap(def_sockdata* pFd)
 	//----------------------------------------------------------------------------------------------	
 	timeout.tv_sec = 30;
 	timeout.tv_usec = 0;
+	//设置接收超时
+	setsockopt(new_fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout)); 
 	while(1)
 	{ 
-		//设置接收超时
-		setsockopt(new_fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout)); 
 		/* recv */
 		offset = recv(new_fd, pRecvBuff, RECV_BUFF_MAX, 0); 
 		if(offset <= 0)
