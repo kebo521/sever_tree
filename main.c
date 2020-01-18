@@ -398,9 +398,12 @@ int main(int argc, char* argv[])
 	
 	{
 		int fd;
-		/*
-		char sName[64],datetime[24];
-		GetDateTimeStr(datetime);
+		char sName[64],datetime[20];
+		time_t timer;//long
+		struct tm *pblock;
+		timer = time(NULL);
+		pblock = localtime(&timer);
+		sprintf(datetime,"%02d%02d%02d%02d%02d%02d",pblock->tm_year - 100,pblock->tm_mon+1,pblock->tm_mday,pblock->tm_hour,pblock->tm_min,pblock->tm_sec);
 		sprintf(sName,"err%s.log",datetime);
 		fd = open(sName, O_CREAT|O_RDWR, 0666);
 		if (fd != -1)
@@ -415,7 +418,6 @@ int main(int argc, char* argv[])
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
 		}
-		*/
 		fd = open("/dev/null", O_RDWR, 0);
 		if (fd != -1)
 		{
@@ -441,7 +443,7 @@ int main(int argc, char* argv[])
 	/* 等待线程pthread释放 */
 	pthread_join(t8ID, NULL);
 	pthread_join(t6ID, NULL);
-	
+	TRACE("\r\n>>>>>>>sever main Handle out<<<<<<\r\n",ret,t8ID);
 	exit( 0); 
 }
 

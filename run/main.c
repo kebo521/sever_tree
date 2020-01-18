@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 			_pid_t = wait(&pid); //---等待孙进程结束------
 			gmTrace("------reRunAPP-[%d,%d]---------\n",_pid_t,pid);
 			sleep(5);
-			return 1;
+			//return 1;
 		} 
 		else break; //孙进程，跳出外面执行
 	} 
