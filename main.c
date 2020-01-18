@@ -63,6 +63,35 @@ int OsGetTickCount(void)
 	return (time_tv.tv_sec*1000 + time_tv.tv_usec/1000);
 }
 
+int Exp_StrOut(char *pSendBuff,int sendSize,int timeMs,EXP_UNIT *pUnit)
+{
+	int ret,offset=0;
+	while(pUnit)
+	{
+		if(pUnit->type==DATA_DEFINE_STR)
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->STR[%s]\r\n",timeMs,pUnit->pStr);
+		if(pUnit->type==DATA_DEFINE_BUFF)
+		{
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->BUFF[%d]:\r\n",timeMs,pUnit->Len);
+			offset += ret;
+			ret=gBcdtoStr_n(pUnit->pBuff,pUnit->Len,pSendBuff+offset,SEND_BUFF_MAX-offset);
+		}
+		else if(pUnit->type==DATA_DEFINE_TAG)
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->[%x[%d]]\r\n",timeMs,pUnit->Tag,pUnit->decimals);
+		else if(pUnit->type==DATA_DEFINE_ASIC4)
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->Asi:%s\r\n",timeMs,pUnit->Asi);
+		else if(pUnit->type==DATA_DEFINE_RULES)
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->%c%c\r\n",timeMs,pUnit->pRule->ExpChars[0],pUnit->pRule->ExpChars[1]);
+		else
+			ret=snprintf(pSendBuff+offset,sendSize-offset,"Result[%d]->type[%d],decimals[%d],Result[%d]\r\n",timeMs,pUnit->type,pUnit->decimals,pUnit->Result);
+		if(ret > 0) offset += ret;
+		else break;
+		pUnit=pUnit->pNext;
+	}
+	return offset;
+}
+
+
 void* EXP_LenSwap(def_sockdata* pFd)
 {
 	int new_fd = pFd->new_fd;
@@ -126,37 +155,15 @@ void* EXP_LenSwap(def_sockdata* pFd)
 			int startimeMs;
 			EXP_UNIT *pUnit;
 			char *p=pRecvBuff;
-			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->RecvBuff",(u8*)pRecvBuff,len);
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->lRecvBuff",(u8*)pRecvBuff,len);
 			startimeMs = OsGetTickCount();
 			pUnit=EXP_StrALL(&p,p+len);
-			offset = 2;
-			while(pUnit)
-			{
-				if(pUnit->type==DATA_DEFINE_STR)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->STR[%s]\r\n",OsGetTickCount()-startimeMs,pUnit->pStr);
-				if(pUnit->type==DATA_DEFINE_BUFF)
-				{
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->BUFF[%d]:\r\n",OsGetTickCount()-startimeMs,pUnit->Len);
-					offset += ret;
-					ret=gBcdtoStr_n(pUnit->pBuff,pUnit->Len,pSendBuff+offset,SEND_BUFF_MAX-offset);
-				}
-				else if(pUnit->type==DATA_DEFINE_TAG)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->[%x[%d]]\r\n",OsGetTickCount()-startimeMs,pUnit->Tag,pUnit->decimals);
-				else if(pUnit->type==DATA_DEFINE_ASIC4)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->Asi:%s\r\n",OsGetTickCount()-startimeMs,pUnit->Asi);
-				else if(pUnit->type==DATA_DEFINE_RULES)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->%c%c\r\n",OsGetTickCount()-startimeMs,pUnit->pRule->ExpChars[0],pUnit->pRule->ExpChars[1]);
-				else
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->type[%d],decimals[%d],Result[%d]\r\n",OsGetTickCount()-startimeMs,pUnit->type,pUnit->decimals,pUnit->Result);
-				if(ret > 0) offset += ret;
-				else break;
-				pUnit=pUnit->pNext;
-			}
+			offset = Exp_StrOut(pSendBuff+2,SEND_BUFF_MAX-2,OsGetTickCount()-startimeMs,pUnit);
 			EXP_FreeUNIT(pUnit,0);
-			pSendBuff[0]=(offset-2)/256;
-			pSendBuff[1]=(offset-2)&0xff;
-			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->SendBuff",(u8*)pSendBuff,offset);
-			send(new_fd, pSendBuff, offset, 0); 
+			pSendBuff[0]=offset/256;
+			pSendBuff[1]=offset&0xff;
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->lSendBuff",(u8*)pSendBuff,offset);
+			send(new_fd, pSendBuff, offset+2, 0); 
 			//Trace_PutMsg(pUnit);
 		}
 		else break;
@@ -173,7 +180,7 @@ void* EXP_LenSwap(def_sockdata* pFd)
 void* EXP_StrSwap(def_sockdata* pFd)
 {
 	int new_fd = pFd->new_fd;
-	int ret,offset;
+	int offset;
 	int offLog;
 	char *pRecvBuff,*pSendBuff,*plogBuff,*pBuff;
 	struct timeval timeout; 
@@ -215,34 +222,12 @@ void* EXP_StrSwap(def_sockdata* pFd)
 			EXP_UNIT *pUnit;
 			char *p=pRecvBuff;
 			pRecvBuff[offset]='\0';
-			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->RecvBuff:%s\r\n",pRecvBuff);
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->sRecvBuff:%s\r\n",pRecvBuff);
 			startimeMs = OsGetTickCount();
 			pUnit=EXP_StrALL(&p,p+offset);
-			offset = 0;
-			while(pUnit)
-			{
-				if(pUnit->type==DATA_DEFINE_STR)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->STR[%s]\r\n",OsGetTickCount()-startimeMs,pUnit->pStr);
-				if(pUnit->type==DATA_DEFINE_BUFF)
-				{
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->BUFF[%d]:\r\n",OsGetTickCount()-startimeMs,pUnit->Len);
-					offset += ret;
-					ret=gBcdtoStr_n(pUnit->pBuff,pUnit->Len,pSendBuff+offset,SEND_BUFF_MAX-offset);
-				}
-				else if(pUnit->type==DATA_DEFINE_TAG)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->[%x[%d]]\r\n",OsGetTickCount()-startimeMs,pUnit->Tag,pUnit->decimals);
-				else if(pUnit->type==DATA_DEFINE_ASIC4)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->Asi:%s\r\n",OsGetTickCount()-startimeMs,pUnit->Asi);
-				else if(pUnit->type==DATA_DEFINE_RULES)
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->%c%c\r\n",OsGetTickCount()-startimeMs,pUnit->pRule->ExpChars[0],pUnit->pRule->ExpChars[1]);
-				else
-					ret=snprintf(pSendBuff+offset,SEND_BUFF_MAX-offset,"Result[%d]->type[%d],decimals[%d],Result[%d]\r\n",OsGetTickCount()-startimeMs,pUnit->type,pUnit->decimals,pUnit->Result);
-				if(ret > 0) offset += ret;
-				else break;
-				pUnit=pUnit->pNext;
-			}
+			offset = Exp_StrOut(pSendBuff,SEND_BUFF_MAX,OsGetTickCount()-startimeMs,pUnit);
 			EXP_FreeUNIT(pUnit,0);
-			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->SendBuff:%s",pSendBuff);
+			offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," ->sSendBuff:%s",pSendBuff);
 			send(new_fd, pSendBuff, offset+1, 0); 
 			//Trace_PutMsg(pUnit);
 		}
