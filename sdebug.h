@@ -27,7 +27,7 @@ extern int _vsprintf(char *buf, const char *fmt, _va_list args);
 extern int gBcdtoStr_n(u8 *pBcd, int len,char *pOut,int outSize);
 
 extern void gTrace(const char *format,...);
-extern void gTraceHex(char *pTitle,u8 *pBcd, int len);
+extern void gTraceHex(char *pTitle,void *pBcd, int len);
 
 #define TRACE(...) 				gTrace(__VA_ARGS__)
 #define TRACE_HEX(Msg,buf,len) 	gTraceHex(Msg,buf,len)

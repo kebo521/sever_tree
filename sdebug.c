@@ -463,7 +463,7 @@ int gBcdtoStr_n(u8 *pBcd, int len,char *pOut,int outSize)
 }
 
 //=================================================================
-void gTraceHex(char *pTitle,u8 *pBcd, int len)
+void gTraceHex(char *pTitle,void *pBcd, int len)
 {
 /*
 	int i;
@@ -494,7 +494,7 @@ void gTraceHex(char *pTitle,u8 *pBcd, int len)
 		return;
 	}
 	len1 = sprintf(sbuff,"%s[%d]:\r\n",pTitle,len);
-	len2 = gBcdtoStr_n(pBcd,len,sbuff+len1,sizeof(sbuff)-len1);
+	len2 = gBcdtoStr_n((u8*)pBcd,len,sbuff+len1,sizeof(sbuff)-len1);
 	//*pSave = '\0'; fputs(sbuff, stdout);
 	fwrite(sbuff,1,len1+len2,stdout);
 }

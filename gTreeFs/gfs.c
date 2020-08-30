@@ -15,46 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-#include "communal.h"
+
+#include "gfs_api.h"
 
 
 #ifdef GTREE_FILE_COURCE
 
 
-#define GFS_PATH_TAG				('/')
-//========文件路径检查===返回 1,文件路径，-1非文件夹，字符不匹配，0 匹配文件------
-int gfs_strcmp_path(u8* pPath,u8* strTag,u8 pathTag)
-{
-	if(strTag==NULL)
-	{
-		while(*pPath != '\0' && *pPath != pathTag) pPath++;
-		if(*pPath == pathTag)
-			return 1;
-		return 0;
-	}
-	
-	while(*strTag)
-	{
-		if(*pPath != *strTag)
-			return -1;
-		pPath++;
-		strTag++;
-	}
-	if(*pPath == pathTag)
-		return 1;
-	if(*pPath)	//后面还有文件名
-		return -1;
-	return 0;
-}
-
 void memcpy_u32(u32* pU1,u32* pU2,int len)
-{
-	while(len--)
-		*pU1++ = *pU2++;
-}
-
-void memcpy_u8(u8* pU1,u8* pU2,int len)
 {
 	while(len--)
 		*pU1++ = *pU2++;
@@ -66,84 +34,68 @@ void memset_u32(u32* pU1,u32 tag,int len)
 		*pU1++ = tag;
 }
 
-void memset_u8(u8* pU1,u8 tag,int len)
-{
-	while(len--)
-		*pU1++ = tag;
-}
-
-void strcpy_char(char* pS1,char* pS2)
-{
-	while(*pS2)
-	{
-		*pS1++ = *pS2++;
-	}
-	*pS1 = *pS2;
-}
-
 int memcmp_u32(u32* pU1,u32* pU2,int len)
 {
-	while(len--)
+	int i;
+	for(i=0;i<len;i++)
 	{
 		if (*pU1 != *pU2)
-			return (*pU1 - *pU2);
+			return (i+1);
 		pU1++; pU2++;
 	}
 	return 0;
 }
 
 //================================================================================
-static DfGTreeFsGlobal gGlobalOldeData;
 static DfGTreeFsBasi gBasiGlobal={0};
-u32 gfs_erase_times=0;
-
-int gfs_BalancedGlobalInit(DfGTreeFsGlobal *pGlobal)
+int gfs_BalancedGlobalInit(void)
 {
 	u32 Addr;
-	DfGTreeFsBlockHead t;
-	u16 i,max,eMax,flag;
+	DfGTreeFsGlobal gGlobalOldeData;
+	u16 buffCoutIndex=gBasiGlobal.gfsCoutIndex;
 	if(gBasiGlobal.gfsCoutSize == 0) return -1;
-	max = gBasiGlobal.gfsCoutSize*(GFS_BLOCK_SIZE/sizeof(DfGTreeFsGlobal));
-	eMax = 0; flag=0;
-	for(i=0;i<max;i++)
+	gBasiGlobal.gfsCoutIndex = gBasiGlobal.gfsCoutSize*(GFS_BLOCK_SIZE/sizeof(DfGTreeFsGlobal));
+	while(gBasiGlobal.gfsCoutIndex--)
 	{
-		Addr=gBasiGlobal.gfsCoutStart*GFS_BLOCK_SIZE + (sizeof(DfGTreeFsGlobal)*i);
-		if(sizeof(t) == SPI_Flash_Read(Addr,&t,sizeof(t)))
-		{
-			if(t.head == GFS_BASIC_GUID)
-			{
-				flag=1;
-			}
-			else 
-			{
-				if(t.head != GFS_BASIC_NULL)
-					eMax++;
-				if(flag) break;
-			}
-		}
-	}
-	if(flag)
-	{
-		gBasiGlobal.gfsCoutIndex=i-1;
 		Addr=gBasiGlobal.gfsCoutStart*GFS_BLOCK_SIZE + (sizeof(DfGTreeFsGlobal)*gBasiGlobal.gfsCoutIndex);
-		if(sizeof(gGlobalOldeData) == SPI_Flash_Read(Addr,&gGlobalOldeData,sizeof(gGlobalOldeData)))
+		if(sizeof(gGlobalOldeData.t) == SPI_Flash_Read(Addr,&gGlobalOldeData.t,sizeof(gGlobalOldeData.t)))
 		{
-			memcpy_u32((u32*)pGlobal,(u32*)&gGlobalOldeData,sizeof(DfGTreeFsGlobal)/sizeof(u32));
-			return sizeof(gGlobalOldeData);
+			if(gGlobalOldeData.t.head == GFS_BASIC_GUID && gGlobalOldeData.t.flagG == 'G')
+			{
+				if(sizeof(gGlobalOldeData) == SPI_Flash_Read(Addr,&gGlobalOldeData,sizeof(gGlobalOldeData)))
+				{
+					if(buffCoutIndex != gBasiGlobal.gfsCoutIndex)
+					{
+						TRACE("##buffCoutIndex[%d->%d]gfsCoutSize=%d", buffCoutIndex, gBasiGlobal.gfsCoutIndex, gBasiGlobal.gfsCoutSize);
+					}
+					
+					{
+						u32		NewData[32];	//空块 block
+						u32		OldData[32];	//需要察除的块
+						int		i;
+						for(i=0;i<32;i++)
+							NewData[i] =gBasiGlobal.g.NullBit[i]^gBasiGlobal.g.EraseBit[i];
+						for(i=0;i<32;i++)
+							OldData[i] =gGlobalOldeData.NullBit[i]^gGlobalOldeData.EraseBit[i];
+						
+						if(memcmp_u32(OldData,NewData,sizeof(NewData)/sizeof(u32)))
+						{
+							TRACE_HEX("  gBasiGlobal.g",(u8*)&gBasiGlobal.g, sizeof(gBasiGlobal.g));
+							TRACE_HEX("gGlobalOldeData",(u8*)&gGlobalOldeData, sizeof(gGlobalOldeData));
+						}
+					}
+					//TRACE("Global 3Read[%x]->[%d] [%X][%d] OK",Addr,gBasiGlobal.gfsCoutIndex,gGlobalOldeData.t.head,gGlobalOldeData.t.flagG);
+					memcpy_u32((u32*)&gBasiGlobal.g,(u32*)&gGlobalOldeData,sizeof(DfGTreeFsGlobal)/sizeof(u32));
+					return sizeof(gBasiGlobal.g);
+				}
+			}
 		}
 	}
 	//----------------引导块需要初始化-----------------------
-	if(eMax >= (GFS_BLOCK_SIZE/sizeof(DfGTreeFsGlobal)))
-	{
-		max=eMax/(GFS_BLOCK_SIZE/sizeof(DfGTreeFsGlobal));
-		for(i=0;i<max;i++) 
-			SPI_Flash_OneSector(gBasiGlobal.gfsCoutStart+i);
-		gfs_erase_times++;
-	}
-	memset_u32((u32*)&gGlobalOldeData,0xffffffff,sizeof(gGlobalOldeData)/sizeof(u32));
-	gGlobalOldeData.t.head = GFS_BASIC_GUID;
-	gGlobalOldeData.t.index = 0;
-	memcpy_u32((u32*)pGlobal,(u32*)&gGlobalOldeData,sizeof(DfGTreeFsGlobal)/sizeof(u32));
+	memset_u32((u32*)&gBasiGlobal.g,0xffffffff,sizeof(gBasiGlobal.g)/sizeof(u32));
+	gBasiGlobal.g.t.head = GFS_BASIC_GUID;
+	gBasiGlobal.g.t.index = 0;
+	gBasiGlobal.g.t.flagG	='G';
 	gBasiGlobal.gfsCoutIndex = 0;
 	TRACE("-------BalancedGlobalInit*NULL------------\r\n");
 	return 0;
@@ -156,15 +108,15 @@ int gfs_BalancedGlobalSave(int pNew)
 	int ret=-1;
 	u16 i,max,Esblock[16];
 	u16 maxIndex,blockNum;
+	DfGTreeFsGlobal gGlobalOldeData;
 	blockNum = GFS_BLOCK_SIZE/sizeof(DfGTreeFsGlobal);
 	maxIndex = gBasiGlobal.gfsCoutSize*blockNum;
-	
 	i=maxIndex;
 	max=0;
-	if(gBasiGlobal.g.flagClear != 0xFF)
+	if(gBasiGlobal.g.t.flagClear != 0xFF)
 	{
 		pNew=1;
-		gBasiGlobal.g.flagClear = 0xFF;
+		gBasiGlobal.g.t.flagClear = 0xFF;
 	}
 	while(i--)
 	{
@@ -174,39 +126,60 @@ int gfs_BalancedGlobalSave(int pNew)
 			if(gBasiGlobal.gfsCoutIndex >= maxIndex)
 			{
 				gBasiGlobal.gfsCoutIndex=0;
-				if(max<(sizeof(Esblock)/sizeof(Esblock[0])))
-					Esblock[max++] = gBasiGlobal.gfsCoutSize;
+				if(max < (sizeof(Esblock)/sizeof(Esblock[0])))
+					Esblock[max++] = gBasiGlobal.gfsCoutSize-1;	//End
 			}
-			else if((gBasiGlobal.gfsCoutIndex%blockNum)==0)
+			else if((gBasiGlobal.gfsCoutIndex % blockNum) == 0)
 			{
-				if(max<(sizeof(Esblock)/sizeof(Esblock[0])))
-					Esblock[max++] = gBasiGlobal.gfsCoutIndex/blockNum;
+				if(max < (sizeof(Esblock)/sizeof(Esblock[0])))
+				{
+					if(gBasiGlobal.gfsCoutIndex == 0)
+						Esblock[max++] = gBasiGlobal.gfsCoutSize-1;	//End
+					else
+						Esblock[max++] = (gBasiGlobal.gfsCoutIndex/blockNum) -1;	//0~n
+
+				}
+					
 			}
 		}
-		
 		//TRACE("---BalancedGlobalSave gfsCoutIndex[%d]--\r\n",gBasiGlobal.gfsCoutIndex);
 		Addr=gBasiGlobal.gfsCoutStart*GFS_BLOCK_SIZE + (sizeof(DfGTreeFsGlobal)*gBasiGlobal.gfsCoutIndex);
-		if(sizeof(DfGTreeFsGlobal) != SPI_Flash_Write(Addr,&gBasiGlobal.g,sizeof(DfGTreeFsGlobal)))
+		ret = SPI_Flash_Write(Addr,&gBasiGlobal.g,sizeof(gBasiGlobal.g));
+		if(sizeof(gBasiGlobal.g) != ret)
+		{
+			TRACE("DATA Flash Write[%d]->[%d]\r\n",sizeof(gBasiGlobal.g),ret);
 			continue;
-		if(sizeof(gGlobalOldeData) != SPI_Flash_Read(Addr,&gGlobalOldeData,sizeof(gGlobalOldeData)))
+		}
+		//memset_u32((u32*)&gGlobalOldeData,0x00,sizeof(gGlobalOldeData)/sizeof(u32));
+		ret = SPI_Flash_Read(Addr,&gGlobalOldeData,sizeof(gGlobalOldeData));
+		if(sizeof(gGlobalOldeData) != ret)
+		{
+			TRACE("DATA Flash Read[%d]->[%d]\r\n",sizeof(gGlobalOldeData),ret);
 			continue;
-		if(memcmp_u32((u32*)&gBasiGlobal.g ,(u32*)&gGlobalOldeData,sizeof(DfGTreeFsGlobal)/sizeof(u32)) != 0)
+		}
+		if(memcmp_u32((u32*)&gBasiGlobal.g ,(u32*)&gGlobalOldeData,sizeof(DfGTreeFsGlobal)/sizeof(u32)))
 		{
 			if(pNew == 0)
 			{
-				TRACE("BalancedGlobalSave->pNew[%d]",pNew);
+				TRACE("BalancedGlobalSave->pNew[%d]\r\n",pNew);
 			}
 			pNew=1;	
+			TRACE_HEX("SPI Flash_Write",&gBasiGlobal.g, sizeof(DfGTreeFsGlobal));
+			TRACE_HEX("SPI Flash_Read",&gGlobalOldeData,sizeof(gGlobalOldeData));
 			continue;
 		}
+		//TRACE("Global Write[%x]->[%d] [%X][%d] OK\r\n",Addr,gBasiGlobal.gfsCoutIndex,gBasiGlobal.g.t.head,gBasiGlobal.g.t.flagG);
 		ret = sizeof(DfGTreeFsGlobal);
 		break;
 	}
 	//----------------检查是否有察除块------------------------
 	for(i=0;i<max;i++)
 	{
-		SPI_Flash_OneSector(Esblock[i]-1);
+		SPI_Flash_EraseOne(SPI_SECTOR_SIZE*(gBasiGlobal.gfsCoutStart+ Esblock[i]));
+		//SPI_Flash_OneSector(gBasiGlobal.gfsCoutStart+ Esblock[i]);
+		#ifdef GTREE_FILE_ERR_RECORD
 		gfs_erase_times++;
+		#endif
 	}
 	//--------------------------------------------------------
 	if(ret < 0)
@@ -216,16 +189,14 @@ int gfs_BalancedGlobalSave(int pNew)
 	return ret;
 }
 
-
-
-void gfs_BalancedEraseOk(void)
+void gfs_BalancedGlobalErase(void)
 {
 	u32 Addr;
-	gBasiGlobal.g.flagClear=0x55;
-	//TRACE("---BalancedGlobalSave gfsCoutIndex[%d]--\r\n",gBasiGlobal.gfsCoutIndex);
 	Addr=gBasiGlobal.gfsCoutStart*GFS_BLOCK_SIZE + (sizeof(DfGTreeFsGlobal)*gBasiGlobal.gfsCoutIndex);
-	SPI_Flash_Write(Addr,&gBasiGlobal.g,sizeof(DfGTreeFsGlobal)-sizeof(gBasiGlobal.g.NullBit)-sizeof(gBasiGlobal.g.EraseBit));
+	gBasiGlobal.g.t.flagClear=0x55;	//标记 已经察除
+	SPI_Flash_Write(Addr,&gBasiGlobal.g.t,sizeof(gBasiGlobal.g.t));
 }
+//==================================================================================================
 
 
 int gfs_FsReadblock(u16 block,u16 offset,void* buff,u16 size)
@@ -245,7 +216,7 @@ int gfs_FsWriteblock(u16 block,u16 offset,void* buff,u16 size)
 		for(i=0;i<size;i++)
 		{
 			if(pTag[i] != CheckBuff[i])
-				return 0;
+				return i;
 		}
 		return size;
 	}
@@ -255,7 +226,7 @@ int gfs_FsWriteblock(u16 block,u16 offset,void* buff,u16 size)
 int gfs_FsEraseblock(u16 block)
 {
 //	TRACE("----gfs Eraseblock block[%d]----",block);
-	return SPI_Flash_OneSector(gBasiGlobal.gfsBlockStart+block);
+	return SPI_Flash_EraseOne((gBasiGlobal.gfsBlockStart+block)*SPI_SECTOR_SIZE);
 }
 //================================================================================
 
@@ -270,7 +241,7 @@ int gfs_RecordBlockIndex(u16 i,u16 par)
 		return -1;
 	}
 	oldIndex = gBasiGlobal.g.BlockIndex[i];
-	newIndex = ~(par+1);	//加一个固定值避免 ~0 == 0xFFFF
+	newIndex = ~(++par);	//加一个固定值避免 ~0 == 0xFFFF
 	gBasiGlobal.g.BlockIndex[i] = newIndex;
 	if(newIndex == (newIndex&oldIndex))
 	{
@@ -295,6 +266,7 @@ u16 gfs_GetNewBlockNum(void)
 	{
 		if(gBasiGlobal.g.BlockIndex[i] == GFS_INDEX_NULL)
 		{
+			gBasiGlobal.g.BlockIndex[i] = GFS_BASIC_DATA;	//避免其它线程抢占入口
 			return i;
 		}
 	}
@@ -315,8 +287,7 @@ u16 gfs_ScanFile_BlockIndex(DfGTreeFsFileName *pName,const char *path,char pathT
 			gfs_FsReadblock(gfs_GetBlockIndex(i),0,pName,sizeof(DfGTreeFsFileName));
 			if(pName->fType != pathType) 
 				continue;	//文件夹内容不能匹配
-
-			if(gfs_strcmp_path((u8*)path,(u8*)pName->filepath,'\0') >= 0)
+			if(strcmp(path,pName->filepath)==0)
 			{
 				return i;
 			}
@@ -348,7 +319,6 @@ void gfs_RecordDelete(u16* pIndexArray,int max)
 
 void gfs_UndoRecordDelete(u16* pIndexArray,int max)
 {
-	u32 bitflag;
 	int i;
 	u16 ei,b;
 	for(i=0;i<max;i++)
@@ -361,33 +331,13 @@ void gfs_UndoRecordDelete(u16* pIndexArray,int max)
 			TRACE("gfs UndoRecordDelete EraseBlock[%d] tobig Err\r\n",pIndexArray[i]);
 			return;
 		}
-		
 		b = pIndexArray[i]%(sizeof(gBasiGlobal.g.EraseBit[0])*8);
-		bitflag = (0x01 << (b));
-		if(!(bitflag&gBasiGlobal.g.EraseBit[ei]))
-		{
-			gBasiGlobal.g.EraseBit[ei] |= bitflag;
-		}
+		gBasiGlobal.g.EraseBit[ei] |= (0x01 << (b));
 	}
 }
 
 
-int gfs_RecordBlockEraseBit(u16 EraseBlock)
-{
-	u16 i,b;
-	if(EraseBlock == GFS_INDEX_NULL) return 1;
-	i = EraseBlock/(sizeof(gBasiGlobal.g.EraseBit[0])*8);
-	if(i >= (sizeof(gBasiGlobal.g.EraseBit)/sizeof(gBasiGlobal.g.EraseBit[0])))
-	{
-		TRACE("gfs RecordEraseBlockBit EraseBlock[%d] tobig Err\r\n",EraseBlock);
-		return -1;
-	}
-	b = EraseBlock%(sizeof(gBasiGlobal.g.EraseBit[0])*8);
-	gBasiGlobal.g.EraseBit[i] &= ~(0x01<<b);
-	return 0;
-}
-
-int gfs_CheckEraseBlockBit(int initFalg)
+int gfs_CheckEraseBlockBit(void)
 {
 	u16 i,iMax,b,bMax;
 	u32 bitflag, UpFlag = 0;
@@ -403,8 +353,8 @@ int gfs_CheckEraseBlockBit(int initFalg)
 			{
 				if(!(gBasiGlobal.g.EraseBit[i] & bitflag))
 				{//-----察除前面被标记的块-------
-					if(initFalg==0 || gBasiGlobal.g.flagClear == 0xFF)
-					{//---------非 FF 已经察除不需要再重复动作---
+					if(gBasiGlobal.g.t.flagClear == 0xFF)
+					{//--非 FF 已经察除不需要再重复动作---
 						gfs_FsEraseblock(i*bMax + b);
 						UpFlag++;
 					}
@@ -416,13 +366,11 @@ int gfs_CheckEraseBlockBit(int initFalg)
 		}
 	}
 	if(UpFlag)
-	{
-		gfs_BalancedEraseOk();
+	{//---当前位置标记已察除-----
+		gfs_BalancedGlobalErase();
 	}
-//	TRACE("gfs CheckEraseBit ERASE_Times[%d]\r\n",UpFlag);
 	return UpFlag;
 }
-
 
 
 u16 gfs_GetNextNullBlock(void)
@@ -444,13 +392,13 @@ u16 gfs_GetNextNullBlock(void)
 		if(Ix < IxMax && (gBasiGlobal.g.NullBit[Ix] & bitflag))
 		{
 			gBasiGlobal.g.NullBit[Ix] &= ~bitflag;
-			gBasiGlobal.g.EraseBit[Ix] &= ~bitflag;	//用于异常处理，解决文件没有close而引发碎片
+			//gBasiGlobal.g.EraseBit[Ix] &= ~bitflag;	//用于异常处理，解决文件没有close而引发碎片
 			return gBasiGlobal.gfsNewIndex++;
 		}
 		gBasiGlobal.gfsNewIndex++;
 	}
 	TRACE("*****GetNextNullBlock ERR*[%d]**Is No BitSpace*****\r\n",gBasiGlobal.gfsNewIndex);
-	TRACE_HEX("NullBit",(u8*)gBasiGlobal.g.NullBit,IxMax*sizeof(gBasiGlobal.g.NullBit[0]));
+	//TRACE_HEX("NullBit",(u8*)gBasiGlobal.g.NullBit,IxMax*sizeof(gBasiGlobal.g.NullBit[0]));
 	return GFS_INDEX_NULL;
 }
 
@@ -458,48 +406,64 @@ u16 gfs_GetNextNullBlock(void)
 
 
 
-int gfs_Init(u16 startCap,u16 fdSize,u16 countSize)
+int gfs_Init(u16 startCap,u16 fdSize,u16 countSize)	//startCap,fdSize,countSize->SPI_BLOCK_SIZE
 {
-	if(fdSize <= countSize) return -1;
+	if(GFS_BLOCK_SIZE % sizeof(DfGTreeFsGlobal)) return -1;
+	if(fdSize <= countSize) return -2;
+	if(fdSize <= 64) return -3;
 	gBasiGlobal.gfsCoutStart = startCap;
 	gBasiGlobal.gfsCoutSize = countSize;
 	gBasiGlobal.gfsBlockStart = startCap+countSize;
 	gBasiGlobal.gfsBlockSize = fdSize-countSize;
-	if(gfs_BalancedGlobalInit(&gBasiGlobal.g))
+	if(sizeof(gBasiGlobal.g) == gfs_BalancedGlobalInit())
 	{
-		gfs_CheckEraseBlockBit(1);
+		gfs_CheckEraseBlockBit();
+		gBasiGlobal.gfsNewIndex=gBasiGlobal.g.t.index;
+		return 0;
 	}
-	gBasiGlobal.gfsNewIndex=gBasiGlobal.g.t.index;
-	return 0;
+	else
+	{
+		int i,max;
+		max = fdSize;
+		for(i=0;i<max;i++) 
+			SPI_Flash_EraseOne((startCap+i)*GFS_BLOCK_SIZE);
+		gfs_BalancedGlobalSave(0);
+		gBasiGlobal.gfsNewIndex=gBasiGlobal.g.t.index;
+		return 1;
+	}
 }
+
 
 int gfs_Fomat(char *pKey)
 {
 	u16 i,max;
+	if(gBasiGlobal.gfsBlockSize < 16)
+		return -1;
 	max = gBasiGlobal.gfsCoutSize+gBasiGlobal.gfsBlockSize;
 	for(i=0;i<max;i++)
 	{
-		TRACE("ERASE[%x]...",gBasiGlobal.gfsCoutStart+i);
-		SPI_Flash_OneSector(gBasiGlobal.gfsCoutStart+i);
+		TRACE("ERASE[%d]...",gBasiGlobal.gfsCoutStart+i);
+		SPI_Flash_EraseOne((gBasiGlobal.gfsCoutStart+i)*GFS_BLOCK_SIZE);
 	}
-	gfs_BalancedGlobalInit(&gBasiGlobal.g);
+	gfs_BalancedGlobalInit();
+	gfs_BalancedGlobalSave(0);
 	gBasiGlobal.gfsNewIndex=gBasiGlobal.g.t.index;
 	return 0;
 }
 
 
-int gfs_SetOffset(DfGFsUnitfd *pfd,int offset, int whence)
+int gfs_SetOffset(gFILE *pfd,int offset, int whence)
 {
 	if(whence == GFS_SEEK_CUR)
 	{
-		if((offset + pfd->fOffset) > (~ pfd->u.h.InvLen)) return -2;
+		if((offset + pfd->fOffset) > pfd->fLen) return -2;
 		pfd->fOffset += offset;
 	}
 	else 
 	{
 		if(whence == GFS_SEEK_END)
 		{
-			offset = (~ pfd->u.h.InvLen) - offset;
+			offset = pfd->fLen - offset;
 		}
 		pfd->IndexB = 0;
 		pfd->bOffet = sizeof(pfd->u.h);
@@ -521,178 +485,110 @@ int gfs_SetOffset(DfGFsUnitfd *pfd,int offset, int whence)
 	return 0;
 }
 
-
-
-
-/*
-DfGFsUnitfd* gfs_RetrieveFile(const char *path, int flags)
+void Gfs_SetNullBit(u16 index,u32 *pBit32)
 {
-	u16 index;
-	DfGTreeFsFileName readName;
-	if(gBasiGlobal.gfsBlockSize == 0)
-		return NULL;
-
-	index=gfs_ScanFile_BlockIndex(&readName,path,GFS_TYPE_BIN);
-	if(index != GFS_INDEX_NULL)
-	{
-		DfGFsUnitfd *pfd;
-		pfd=(DfGFsUnitfd *)malloc(sizeof(DfGFsUnitfd));
-		if(pfd == NULL)
-		{
-			TRACE("gfs Retrievefiles1 malloc is not\r\n");
-			//GFS_ERR_NOMEM
-			return NULL;
-		}
-		memcpy(&pfd->u.h.name,&readName,sizeof(readName));
-		gfs_FsReadblock(gfs_GetBlockIndex(index),sizeof(readName),((u8*)&pfd->u)+sizeof(readName),sizeof(pfd->u)-sizeof(readName));
-		pfd->fOpenFlag = flags;
-		pfd->fInvLen= pfd->u.h.InvLen;
-		pfd->IndexT = index;
-		pfd->flagUpT = 0;
-		pfd->flagUpH = 0;
-		pfd->flagUpE = 0;
-		pfd->flagNew = 0;
-		if(flags&GFS_O_APPEND)
-		{
-			gfs_SetOffset(pfd,0,GFS_SEEK_END);
-		}
-		else if(flags&GFS_O_TRUNC)
-		{
-			if(~ pfd->u.h.InvLen)
-			{
-				pfd->u.h.InvLen = (u32)(~0);
-				pfd->flagNew = 1;
-			}
-			pfd->fOffset = 0;
-			pfd->IndexB = 0;
-			pfd->bOffet = sizeof(pfd->u.h);
-		}
-		else
-		{
-			pfd->fOffset = 0;
-			pfd->IndexB = 0;
-			pfd->bOffet = sizeof(pfd->u.h);
-		}
-		return pfd;
-	}
-	if(flags&GFS_O_CREAT)
-	{
-		index=gfs_GetNewBlockNum();
-		if(index != GFS_INDEX_NULL)
-		{
-			u16 offBlock = gfs_GetNextNullBlock();
-			if(offBlock != GFS_INDEX_NULL)
-			{
-				DfGFsUnitfd *pfd;
-				pfd=(DfGFsUnitfd *)malloc(sizeof(DfGFsUnitfd));
-				if(pfd == NULL)
-				{
-					TRACE("gfs Retrievefiles2 malloc is not\r\n");
-					//GFS_ERR_NOMEM
-					return NULL;
-				}
-				gfs_RecordBlockIndex(index,offBlock);	
-				memset(&pfd->u.h,0xFF,sizeof(pfd->u.h));
-				strcpy(pfd->u.h.name.filepath,path);
-				pfd->u.h.name.fType = GFS_TYPE_BIN;
-				pfd->u.h.fdIndex[0] = offBlock;
-				pfd->fInvLen= (~0);
-				pfd->fOffset = 0;
-				pfd->fOpenFlag = flags;
-				pfd->IndexT = index;
-				pfd->IndexB = 0;
-				pfd->bOffet = sizeof(pfd->u.h);
-				pfd->flagUpT = 1;
-				pfd->flagUpH = 1;
-				pfd->flagUpE = 0;
-				return pfd;
-			}
-			TRACE("gfs Retrievefiles GetNextNullBlock is not\r\n");
-			//GFS_ERR_NOSPC
-			return NULL;
-		}
-		TRACE("gfs Retrievefiles BlockIndex is full\r\n");
-	}
-	return NULL;
+	u32 bitflag,i;
+	bitflag = (0x01<<(index % 32));
+	i = index / 32;
+	pBit32[i] &= ~bitflag;
+	pBit32[i] &= ~bitflag;
 }
 
-DfGFsUnitfd* gfs_RetrievePath(const char *path, int flags)
+
+
+int gfs_checkALL(void)
 {
-	u16 i,blockMax;
-	int ret=0;
-	DfGTreeFsFileName readName;
-	if(gBasiGlobal.gfsBlockSize == 0)
-		return NULL;
-	
+	u32 	NullBit[32];	//空块 block
+	DfgFsUnitBlock tfilePar;
+	u32 offset,fileLen,AllfileLen=0;
+	u32 fileNum=0,blockNUN=0,Lenzero=0;
+	u16 i,blockMax,j,max;
+	if(gBasiGlobal.gfsBlockSize == 0)	
+		return GFS_INDEX_NULL;
+	memset_u32(NullBit,0xFFFFFFFF,sizeof(NullBit)/sizeof(u32));
+	blockMax = sizeof(gBasiGlobal.g.BlockIndex)/sizeof(gBasiGlobal.g.BlockIndex[0]);
+	max = sizeof(tfilePar.h.fdIndex)/sizeof(tfilePar.h.fdIndex[0]);
+	for(i=0;i<blockMax;i++)
+	{
+		if(gBasiGlobal.g.BlockIndex[i] != GFS_INDEX_NULL)
+		{
+			gfs_FsReadblock(gfs_GetBlockIndex(i),0,&tfilePar,sizeof(DfgFsUnitBlock));
+			//tfileHead.name.fType
+			fileLen = ~(tfilePar.h.InvLen);
+			fileNum ++;
+			blockNUN ++;
+			offset = sizeof(tfilePar.fData);
+			Gfs_SetNullBit(gfs_GetBlockIndex(i),NullBit);
+			for(j=0;j<max;j++)	//while(j++)
+			{
+				if(tfilePar.h.fdIndex[j] == GFS_INDEX_NULL) break;
+				Gfs_SetNullBit(tfilePar.h.fdIndex[j],NullBit);
+				//gfs_FsReadblock(Index,0,&tfileHead,sizeof(DfgFsUnitHead));
+				offset += sizeof(DfgFsUnitBlock);
+				blockNUN ++;
+			}
+			tfilePar.h.name.filepath[sizeof(tfilePar.h.name.filepath)-1]='\0';
+			if(fileLen == 0) 
+			{
+				TRACE("*1 Index[%d] Block[%d] is Zero name0[%x]\r\n",i,gBasiGlobal.g.BlockIndex[i],tfilePar.h.name.filepath[0]);
+				Lenzero++;
+			}
+			else if(fileLen <=	sizeof(tfilePar.fData) && offset > sizeof(tfilePar.fData))
+			{
+				TRACE("#1[%d] name[%s] len[%d,%d]-[%d]\r\n",fileNum, tfilePar.h.name.filepath, fileLen, offset,j);
+			}
+			else if(fileLen > sizeof(tfilePar.fData) && (offset-sizeof(tfilePar.fData)) > DfGetBeiSu(fileLen-sizeof(tfilePar.fData),GFS_BLOCK_SIZE))
+			{
+				TRACE("#2[%d] name[%s] len[%d,%d]-[%d]\r\n",fileNum, tfilePar.h.name.filepath, fileLen, offset,j);
+			}
+			else
+			{
+				TRACE("Ok[%d] name[%s] len[%d,%d]-[%d]\r\n",fileNum,tfilePar.h.name.filepath,fileLen,offset,j);
+			}
+			AllfileLen += fileLen;
+		}
+	}
+	TRACE("allfile num[%d] blockNUN[%d<%d] len[%d]\r\n",fileNum,blockNUN,gBasiGlobal.gfsBlockSize,AllfileLen);
+	blockMax = sizeof(gBasiGlobal.g.NullBit)/sizeof(gBasiGlobal.g.NullBit[0]);
+	for(i=0;i<blockMax;i++)
+	{
+		if(gBasiGlobal.g.EraseBit[i] != 0xFFFFFFFF)
+		{
+			TRACE("***EraseBit[%d]=[%X]\r\n",i,gBasiGlobal.g.EraseBit[i]);
+		}
+		if(NullBit[i] !=  gBasiGlobal.g.NullBit[i])
+		{
+			TRACE("###NullBit[%d]=[%X != %X]\r\n",i,NullBit[i],gBasiGlobal.g.NullBit[i]);
+		}
+	}
+	return Lenzero;
+}
+
+
+void gfs_clearNullfile(void)
+{
+	DfgFsUnitHead tfileh;  //	GTREE_FS_UNIT_SIZE
+	u16 i,blockMax,block;
+	if(gBasiGlobal.gfsBlockSize == 0)	
+		return;
 	blockMax = sizeof(gBasiGlobal.g.BlockIndex)/sizeof(gBasiGlobal.g.BlockIndex[0]);
 	for(i=0;i<blockMax;i++)
 	{
-		if(gfs_GetBlockIndex(i) != GFS_INDEX_NULL)
+		if(gBasiGlobal.g.BlockIndex[i] != GFS_INDEX_NULL)
 		{
-			gfs_FsReadblock(gBasiGlobal.g.BlockIndex[i],0,&readName,sizeof(readName));
-			if(readName.fType != GFS_TYPE_FLD) 
-				continue;	//文件夹内容不能匹配
-			ret = gfs_strcmp_path((u8*)path, (u8*)readName.filepath,'/');
-			if(0 <= ret)
+			gfs_FsReadblock(gfs_GetBlockIndex(i),0,&tfileh,sizeof(tfileh));
+			if((~(tfileh.InvLen)) == 0) 
 			{
-				DfGFsUnitfd *pfd;
-				pfd=(DfGFsUnitfd *)malloc(sizeof(DfGFsUnitfd));
-				if(pfd == NULL)
-				{
-					TRACE("gfs Retrievefiles1 malloc is not\r\n");
-					return NULL;
-				}
-				memcpy(&pfd->u.h.name,&readName,sizeof(readName));
-				gfs_FsReadblock(gfs_GetBlockIndex(i),sizeof(readName),((u8*)&pfd->u.h)+sizeof(readName),sizeof(pfd->u.h)-sizeof(readName));
-				pfd->IndexT = i;
-				pfd->flagUpT = 0;
-				pfd->flagUpH = 0;
-				pfd->flagUpE = 0;
-				pfd->flagNew = 0;
-				pfd->fOffset = 0;
-				pfd->IndexB = 0;
-				pfd->bOffet = sizeof(pfd->u.h);
-				return pfd;
+				gfs_RecordDelete(tfileh.fdIndex,sizeof(tfileh.fdIndex)/sizeof(tfileh.fdIndex[0]));
+				block = gfs_GetBlockIndex(i);
+				gfs_RecordBlockIndex(i,GFS_INDEX_NULL); //清除入口地址
+				gfs_RecordDelete(&block,1);
+				gfs_BalancedGlobalSave(1);
+				gfs_CheckEraseBlockBit();
 			}
 		}
 	}
-	if(flags&GFS_O_CREAT)
-	{
-		u16 offBlock=0;
-		i=gfs_GetNewBlockNum();
-		if(i != NULL)
-		{
-			offBlock = gfs_GetNextNullBlock();
-			if(offBlock != GFS_INDEX_NULL)
-			{
-				DfGFsUnitfd *pfd;
-				pfd=(DfGFsUnitfd *)malloc(sizeof(DfGFsUnitfd));
-				if(pfd == NULL)
-				{
-					TRACE("gfs Retrievefiles2 malloc is not\r\n");
-					return NULL;
-				}
-				gfs_RecordBlockIndex(i,offBlock);	
-				memset(&pfd->u.h,0xFF,sizeof(pfd->u.h));
-				strcpy(pfd->u.h.name.filepath,path);
-				pfd->u.h.name.fType = GFS_TYPE_FLD;
-				pfd->u.h.fdIndex[0] = offBlock;
-				pfd->flagUpT = 1;
-				pfd->flagUpH = 1;
-				pfd->flagUpE = 0;
-				pfd->flagNew = 0;
-				pfd->fOffset = 0;
-				pfd->IndexB = 0;
-				pfd->bOffet = sizeof(pfd->u.h);
-				return pfd;
-			}
-			TRACE("gfs RetrievePath GetNextNullBlock is not\r\n");
-		}
-		TRACE("gfs RetrievePath BlockIndex is full\r\n");
-	}
-	return NULL;
 }
 
-*/
 #endif
 
