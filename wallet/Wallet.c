@@ -3,7 +3,7 @@
 
 #include "gMem.h"
 
-#include "hardinfo.h"
+#include "hardInfo.h"
 #include "app_sdk.h"
 #include "voucher.h"
 #include "Wallet.h"
