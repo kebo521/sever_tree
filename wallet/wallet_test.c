@@ -42,6 +42,7 @@ int Conv_StrToBcd_Left(char* str,int slen,u8* bcd)
 void WalletDataInit(void)
 {
 	//gfs_Fomat("123456");
+	SPI_Flash_init();
 	api_gFileInit();
 	#ifdef WALLET_TEST_DATA
 	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x01","证通01收款硬钱包","收款证书",5000);
