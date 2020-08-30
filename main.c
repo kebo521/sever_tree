@@ -248,6 +248,7 @@ void* EXP_StrSwap(def_sockdata* pFd)
 	return NULL; 
 }
 
+extern void WalletDataInit(void);
 extern int WalletDataParseApdu(u8 *pAPDU,u8 *pOut);
 
 void* EXP_ApduSwap(def_sockdata* pFd)
@@ -511,11 +512,20 @@ void* Handle_ApduSever(void* pFd)
 	exit( 0); 
 }
 
+void UI_ShowMemMsg(char* pTitle,char* pMsg,int Mpar)
+{
+	char showErr[24];
+	sprintf(showErr,pMsg,Mpar);
+	TRACE(showErr);
+}
+
+#include "gMem.h"
 
 int main(int argc, char* argv[]) 
 {
 	/* socket->bind->listen->accept->send/recv->close*/
 	pthread_t t6ID,t8ID,t5ID;
+	u32 *pMemBuff;
 	int ret;
 	{
 		char buff[20];
@@ -561,6 +571,7 @@ int main(int argc, char* argv[])
 		
 	}
 	signal(SIGCHLD,SIG_IGN); 
+
 	
 	ret=pthread_create(&t6ID,NULL,&Handle_6666Sever,NULL);
 	TRACE("create Handle 6666Sever[%d],id[%d]",ret,t6ID);
@@ -575,6 +586,11 @@ int main(int argc, char* argv[])
 		fprintf(stderr,"pthread8create[%d] error:[%s]\r\n",ret, strerror(errno)); 
 	}
 
+	pMemBuff= (u32 *)malloc(16*1024);
+	gMemAllocInit(pMemBuff,16*1024,4);
+	gLoadFunAllocShowMsg(UI_ShowMemMsg);
+	WalletDataInit();
+	
 	ret=pthread_create(&t5ID,NULL,&Handle_ApduSever,NULL);
 	TRACE("create Handle 555Sever[%d],id[%d]",ret,t5ID);
 	if(ret)
@@ -583,9 +599,10 @@ int main(int argc, char* argv[])
 	}
 
 	/* 等待线程pthread释放 */
-	pthread_join(t5ID, NULL);
 	pthread_join(t8ID, NULL);
 	pthread_join(t6ID, NULL);
+	pthread_join(t5ID, NULL);
+	free(pMemBuff);
 	TRACE("\r\n>>>>>>>sever main Handle out<<<<<<\r\n",ret,t8ID);
 	if (err_fd != -1) close(err_fd);
 	if (out_fd != -1) close(out_fd);

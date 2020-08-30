@@ -123,7 +123,7 @@ int GetSessionKey_ATC(u8 *key,u8 *pATC,u8* pOutKey)
 
 int GetMAC(u8 *Mackey,u8 *pIndata,int inlen,u8* pOutMac)
 {
-	u8 outbuff[16];//,iv[16]={0};
+	u8 outbuff[16]={0};//,iv[16]={0};
 	//DfGetBeiSu(inlen,16)
 	/*
 	sm4_cbc_encrypt_decrypt(ALG_ENCRYPT,Mackey,iv,pIndata,outbuff,inlen);
