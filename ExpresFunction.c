@@ -1710,6 +1710,9 @@ extern EXP_UNIT* EXP_FileSysClose(EXP_UNIT* pInPar);
 extern EXP_UNIT* EXP_FileSysRemove(EXP_UNIT* pInPar);
 extern EXP_UNIT* EXP_FileSysAutoTest(EXP_UNIT* pInPar);
 
+extern EXP_UNIT* EXP_WalletInit(EXP_UNIT* pInPar);
+extern EXP_UNIT* EXP_WalletApdu(EXP_UNIT* pInPar);
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-braces"
 
@@ -1798,7 +1801,9 @@ const EXP_FunctionMatchTbl FunctionMatchTbl[] =
 	"sseek",			EXP_FileSysSeek,		//(offset,wer(0,1,2))
 	"sclose",			EXP_FileSysClose,		//()
 	"sremove",			EXP_FileSysRemove,	//("path")
-	"sauto",			EXP_FileSysAutoTest	//(times)
+	"sauto",			EXP_FileSysAutoTest,	//(times)
+	"apdu", 			EXP_WalletApdu,
+	"winit", 			EXP_WalletInit,
 };
 
 #pragma GCC diagnostic pop
