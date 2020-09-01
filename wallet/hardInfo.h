@@ -289,13 +289,15 @@ typedef struct
 
 typedef struct
 {
-	u16	PbcLen;				//人行公钥证书长度
-	u8	PbcPubKeyCert[256-2];				//人民银行公钥证书 TAG=C6 
-	
-	u16	PerLen;				//个人公钥证书长度
-	u8	PersPubKeyCert[256-2];				//个人公钥证书 TAG=C8 
+	u16 bitFlag;			//bit0,PersPriKeyCert,bit1=PersPubKeyCert,bit2=PbcPubKeyCert,bit3=InstructingPatryPubKeyCert
 	u16	KeyLen;				//个人私钥长度
 	u8 PersPriKeyCert[64+32];			//个人私钥 TAG=C9 
+
+	u16	PerLen;				//个人公钥证书长度
+	u8	PersPubKeyCert[256-2];				//个人公钥证书 TAG=C8 
+	
+	u16	PbcLen;				//人行公钥证书长度
+	u8	PbcPubKeyCert[256-2];				//人民银行公钥证书 TAG=C6 
 	
 	u16	InsLen;				//运营机构公钥证书长度
 	u8 InstructingPatryPubKeyCert[256-2];	//运营机构公钥证书 TAG=C7 (可以存放多家运营机构证书)

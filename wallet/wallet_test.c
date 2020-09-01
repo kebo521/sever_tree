@@ -42,13 +42,11 @@ int Conv_StrToBcd_Left(char* str,int slen,u8* bcd)
 void WalletDataInit(void)
 {
 	//gfs_Fomat("123456");
-	SPI_Flash_init();
-	api_gFileInit();
 	#ifdef WALLET_TEST_DATA
-	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x01","证通01收款硬钱包","收款证书",5000);
+	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x01","证通01收款硬钱包","收款证书",654321);
 	pRecvWallet=GetCurrWallet();
 	SetCurrWallet(NULL);
-	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x02","证通02付款硬钱包","付款证书",5000);
+	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x02","证通02付款硬钱包","付款证书",80000);
 	pPayWallet=GetCurrWallet();
 	SetCurrWallet(pRecvWallet);
 	#else

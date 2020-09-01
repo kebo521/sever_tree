@@ -322,9 +322,14 @@ int ReadPubKeyCert(u8* pWalletID,CERT_TYPE type,u8 *pCert,int size)
 	CertKey *CertAll;
 	int ret;
 	CertAll = (CertKey *)gMalloc(sizeof(CertKey));
-	if(CertAll==NULL) return -1;
+	if(CertAll==NULL)
+	{
+		*pCert++ = 0x31;
+		*pCert++ = 0x00;
+		return 2;
+	}
 	ret=APP_FileReadBuff(GetWalletName(WAL_CERK,pWalletID),(u32*)CertAll,sizeof(CertKey));
-	while(ret==0)
+	while(ret>=0)
 	{
 		ret = 0;
 		if(type == CERT_PBC)	//人行公钥证书
@@ -357,6 +362,12 @@ int ReadPubKeyCert(u8* pWalletID,CERT_TYPE type,u8 *pCert,int size)
 		}
 		break;
 	}
+	if(ret <= 0)
+	{
+		*pCert++ = 0x30;
+		*pCert++ = 0x00;
+		ret = 2;
+	}
 	gFree(CertAll);
 	return ret;
 }
@@ -372,21 +383,25 @@ int SavePubKeyCert(u8* pWalletID,CERT_TYPE type,u8 *pCert,int cLen)
 	{
 		memcpy(CertAll->PbcPubKeyCert,pCert,cLen);
 		CertAll->PbcLen = cLen;
+		CertAll->bitFlag &= ~0x04;
 	}
 	else if(type == CERT_INS)// 运营机构证书
 	{
 		memcpy(CertAll->InstructingPatryPubKeyCert,pCert,cLen);
 		CertAll->InsLen = cLen;
+		CertAll->bitFlag &= ~0x08;
 	}
 	else if(type == CERT_PERS)//个人公钥证书
 	{
 		memcpy(CertAll->PersPubKeyCert,pCert,cLen);
 		CertAll->PerLen = cLen;
+		CertAll->bitFlag &= ~0x02;
 	}
 	else if(type == PKEY_PERS)//初始个人私钥参数
 	{
 		memcpy(CertAll->PersPriKeyCert,pCert,cLen);
 		CertAll->KeyLen = cLen;
+		CertAll->bitFlag &= ~0x01;
 	}
 	APP_FileSaveBuff(GetWalletName(WAL_CERK,pWalletID),(u32*)CertAll,sizeof(CertKey));
 	gFree(CertAll);

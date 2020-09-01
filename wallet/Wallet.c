@@ -80,8 +80,8 @@ int Test_CreateDc(DfDC_bt* pDc,u8* pOwnerID,u32 amont)
 
 void Test_CreateWallet(u8* pWalletID,char *pWalletName,char* pNameCert,u32 amont)
 {
-	u8 PWCheck[4],EncKey[16];
 	uWalletFD* pFd;
+	u8 PWCheck[4],EncKey[16];
 	uBalVoucher* pBal;
 	//-----------------付款钱包----------------------------
 	TRACE("CreateWallet[%s]\r\n",pWalletName);
@@ -89,16 +89,20 @@ void Test_CreateWallet(u8* pWalletID,char *pWalletName,char* pNameCert,u32 amont
 	pFd=gCreateWallet(pWalletID,pWalletName,PWCheck);
 	memcpy(pFd->WalletID,pWalletID,sizeof(pFd->WalletID));
 	WalletReadData(pFd);
-	strcpy(pFd->pWallet->Info.WalletName,pWalletName);
+
+	if((u8)pFd->pWallet->Info.WalletName[0] == 0xff)
+	{
+		memcpy(pFd->pWallet->Info.WalletID,pWalletID,sizeof(pFd->pWallet->Info.WalletID));
+		strcpy(pFd->pWallet->Info.WalletName,pWalletName);
+		APP_FileSaveBuff(GetWalletName(WAL_HEAD,pFd->WalletID),(u32*)pFd->pWallet,sizeof(uWalletHead));
+	}
 	if(pFd->pKey == NULL)
 	{
 		u8 certbuff[16];
 		pFd->pKey  = (SM2_PRIVKEY *)gMalloc(sizeof(SM2_PRIVKEY));
-		TRACE("Generate Key[%x] in\r\n",pFd->pKey);
 		sm2_generate_keypair(pFd->pKey->xQ,pFd->pKey->d);
-		TRACE("Generate Key out\r\n");
 		SavePubKeyCert(pFd->WalletID,PKEY_PERS,(u8*)pFd->pKey,sizeof(SM2_PRIVKEY));
-		
+		TRACE("pFd->pKey[%x] -CreateWallet\n",pFd->pKey);
 		certbuff[0]=0x30;
 		certbuff[1]=0x08;
 		strcpy((char*)certbuff+2,pNameCert);
@@ -111,20 +115,15 @@ void Test_CreateWallet(u8* pWalletID,char *pWalletName,char* pNameCert,u32 amont
 	if(pBal == NULL)
 	{
 		pBal=(uBalVoucher*)gMalloc(sizeof(uBalVoucher)+4);
-		TRACE("Generate Dc [%x]in\r\n",pBal);
 		Test_CreateDc(&pBal->tDc,pFd->pKey->xQ,amont);
 		pBal->SubChainNun = 0;
-		//TRACE_HEX("Generate Dc in",pBal,sizeof(uBalVoucher));
 		SaveBalVoucher(GetWalletName(0,pFd->WalletID),pBal);
-		//gFree(pBal);
-		//pBal=ReadBalVoucher(GetWalletName(0,pFd->WalletID));
-		//TRACE_HEX("Generate Dc Out",pBal,sizeof(uBalVoucher));
-		TRACE("SaveBalVoucher[%x] Dc in\r\n",pFd->pRealizeInfo);
+		
 		pFd->pRealizeInfo->uBal=amont;
 		pFd->pRealizeInfo->uAvailableBal=amont;
 		pFd->pRealizeInfo->VoucherBal[0]=amont;
 		APP_FileSaveCont(GetWalletName(WAL_REAL,pFd->WalletID),(u32*)pFd->pRealizeInfo,sizeof(uSystemRealizeInfo));
-		TRACE("SaveBalVoucher pRealizeInfo [%d]ok\r\n",pFd->pRealizeInfo->uBal);
+		TRACE("SaveWAL_REAL[%s][%d]ok\n",GetWalletName(WAL_REAL,pFd->WalletID),amont);
 	}
 	gFree(pBal);
 }
@@ -388,7 +387,7 @@ void WalletReadData(uWalletFD* pFd)
 	if(pFd->pKey == NULL)
 	{
 		pFd->pKey = gMalloc(sizeof(SM2_PRIVKEY));
-		if(APP_FileReadBuff(GetWalletName(WAL_CERK,pFd->WalletID),(u32*)pFd->pKey,sizeof(SM2_PRIVKEY)))
+		if(APP_FileReadBuff(GetWalletName(WAL_CERK,pFd->WalletID),(u32*)pFd->pKey,sizeof(SM2_PRIVKEY))==0)
 		{//-------------解密私钥-------
 			sm4_ecb_encrypt_decrypt(ALG_DECRYPT,pFd->Enckey,(UINT8*)pFd->pKey,(UINT8*)pFd->pKey,sizeof(SM2_PRIVKEY));
 		}
@@ -1319,7 +1318,8 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 
 						memcpy(pOutResI->InsPartyID,pFd->pWallet->Info.FinInstCode,sizeof(pOutResI->InsPartyID));
 						memcpy(pOutResI->WalletID,pFd->WalletID,sizeof(pOutResI->WalletID));
-						memcpy(pOutResI->Random,pFd->RandA,sizeof(pOutResI->Random));
+						//memcpy(pOutResI->Random,pFd->RandA,sizeof(pOutResI->Random));
+						memcpy(pOutResI->TimeStamp,pFd->TimeStamp,sizeof(pOutResI->TimeStamp));
 						p = pOutResI->Certification;
 						//------------------打包证书-----------------
 						ret=ReadPubKeyCert(pFd->WalletID,CERT_INS,p,256);
@@ -1350,6 +1350,10 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 					{
 						DfOnLineRecvRet *pOutResI;
 						u8 buffdata[128];
+						if(inlen >= 6)
+						{
+							memcpy(pFd->TimeStamp,pAPDU->data,inlen);
+						}
 						pOutResI =(DfOnLineRecvRet *)pDataRet;
 						Conv_NumToHex(pFd->pRealizeInfo->uATC,pOutResI->ATC,sizeof(pOutResI->ATC));
 						pOutResI->keyVersion = 0x01;
@@ -1357,9 +1361,10 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						memcpy(pOutResI->InsPartyID,pFd->pWallet->Info.FinInstCode,sizeof(pOutResI->InsPartyID));
 						memcpy(pOutResI->WalletID,pFd->WalletID,sizeof(pOutResI->WalletID));
 						Conv_NumToHex(pFd->pRealizeInfo->uBal,pOutResI->WallAmount,sizeof(pOutResI->WallAmount));
-						api_rand(pFd->FactA,sizeof(pFd->FactA)/4);	//4*4 =16
+						//api_rand(pFd->RandA,sizeof(pFd->RandA)/4);	//4*4 =16
+						memcpy(pOutResI->TimeStamp,pFd->TimeStamp,sizeof(pOutResI->TimeStamp));
 						memcpy(pOutResI->LastTradeIndex,pFd->pRealizeInfo->LastTradeIndex,sizeof(pOutResI->LastTradeIndex));
-						memcpy(pOutResI->Random,pFd->RandA,sizeof(pOutResI->Random));
+						
 						//----------------GetMac1----------------------------------
 						p = buffdata;
 						memcpy(p,pOutResI->InsPartyID,sizeof(pOutResI->InsPartyID));
@@ -1367,8 +1372,10 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						memcpy(p,pOutResI->WalletID,sizeof(pOutResI->WalletID));
 						p += sizeof(pOutResI->WalletID);
 						*p++ = 0x03;	//TransType;
-						memcpy(p,pOutResI->Random,sizeof(pOutResI->Random));
-						p += sizeof(pOutResI->Random);
+						//memcpy(p,pOutResI->Random,sizeof(pOutResI->Random));
+						//p += sizeof(pOutResI->Random);
+						memcpy(p,pFd->TimeStamp,sizeof(pFd->TimeStamp));
+						p += sizeof(pOutResI->TimeStamp);
 						GetMAC_ATC((u8*)"test_MacKey",pOutResI->ATC,buffdata,p-buffdata,pOutResI->MAC1);
 
 						pDataRet = pOutResI->Certification;
@@ -2022,7 +2029,7 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 				pFd=gGetWalletPfd();
 				if(pFd)
 				{
-					TRACE("pFd->pRealizeInfo->uBal=%d\r\n",pFd->pRealizeInfo->uBal);
+					//TRACE("pFd->pRealizeInfo->uBal=%d\r\n",pFd->pRealizeInfo->uBal);
 					Conv_NumToDecimal(pFd->pRealizeInfo->uBal,pDataRet,9);
 					pDataRet += 9;
 					Conv_NumToDecimal(pFd->pRealizeInfo->uAvailableBal,pDataRet,9);

@@ -34,7 +34,7 @@ typedef struct
 	u8 				WalletID[8];	//
 	u8 				WallAmount[6];	//DCEP币串的可用余额
 	u8 				LastTradeIndex[6];	//上次联机交易索引
-	u8 				Random[4];	//APP随机数
+	u8 				TimeStamp[6];		//APP随机数
 	u8 				MAC1[4];	
 	u8 				Certification[];	
 }DfOnLineRecvRet;		//钱包初始化 0x50:

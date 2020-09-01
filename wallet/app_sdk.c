@@ -218,7 +218,7 @@ void Conv_NumToDecimal(u32 num,u8* pbuf,int size)
 {
 	while(size--)
 	{
-		pbuf[size]=((num%10)<<4)|((num/10)%10);
+		pbuf[size]=(((num/10)%10)<<4)|(num%10);
 		num /= 100;
 	}
 }

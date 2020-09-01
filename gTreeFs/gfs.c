@@ -70,16 +70,17 @@ int gfs_BalancedGlobalInit(void)
 					}
 					
 					{
-						u32		NewData[32];	//¿Õ¿é block
-						u32		OldData[32];	//ÐèÒª²ì³ýµÄ¿é
+						u32		NewData[GFS_BIT_FLAG];	//¿Õ¿é block
+						u32		OldData[GFS_BIT_FLAG];	//ÐèÒª²ì³ýµÄ¿é
 						int		i;
-						for(i=0;i<32;i++)
+						for(i=0;i<GFS_BIT_FLAG;i++)
 							NewData[i] =gBasiGlobal.g.NullBit[i]^gBasiGlobal.g.EraseBit[i];
-						for(i=0;i<32;i++)
+						for(i=0;i<GFS_BIT_FLAG;i++)
 							OldData[i] =gGlobalOldeData.NullBit[i]^gGlobalOldeData.EraseBit[i];
 						
 						if(memcmp_u32(OldData,NewData,sizeof(NewData)/sizeof(u32)))
 						{
+							TRACE("##gfsCoutIndex[%d->%x]\n",gBasiGlobal.gfsCoutIndex,Addr);
 							TRACE_HEX("  gBasiGlobal.g",(u8*)&gBasiGlobal.g, sizeof(gBasiGlobal.g));
 							TRACE_HEX("gGlobalOldeData",(u8*)&gGlobalOldeData, sizeof(gGlobalOldeData));
 						}
