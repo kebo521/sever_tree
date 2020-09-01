@@ -251,7 +251,11 @@ void* EXP_StrSwap(def_sockdata* pFd)
 extern void WalletDataInit(void);
 extern int WalletDataParseApdu(u8 *pAPDU,u8 *pOut);
 
-void* EXP_ApduSwap(def_sockdata* pFd)
+extern void SetRecvWallet(void);
+extern void SetPayWallet(void);
+
+
+void* EXP_ApduSwapRecv(def_sockdata* pFd)
 {
 	int new_fd = pFd->new_fd;
 	int offset,ret;
@@ -295,6 +299,7 @@ void* EXP_ApduSwap(def_sockdata* pFd)
 			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," APDU->sRecvBuff",(u8*)pRecvBuff,offset);
 			if(pRecvBuff[0] == 0x80)
 			{
+				SetRecvWallet();
 				ret=WalletDataParseApdu(pRecvBuff,pSendBuff);
 				offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," APDU->sSendBuff",pSendBuff,ret);
 				send(new_fd, pSendBuff, ret, 0);
@@ -315,6 +320,70 @@ void* EXP_ApduSwap(def_sockdata* pFd)
 	return NULL; 
 }
 
+void* EXP_ApduSwapPay(def_sockdata* pFd)
+{
+	int new_fd = pFd->new_fd;
+	int offset,ret;
+	int offLog;
+	u8 *pRecvBuff,*pSendBuff,*pBuff;
+	char *plogBuff;
+	struct timeval timeout; 
+	pBuff = (u8*)malloc(RECV_BUFF_MAX+SEND_BUFF_MAX+DEBUG_BUFF_MAX);
+	pRecvBuff = pBuff;
+	pSendBuff = pBuff + RECV_BUFF_MAX;
+	plogBuff = (char*)pSendBuff + SEND_BUFF_MAX;
+	//----------------------------------------------------------------------------------------------
+	offLog = DEBUG_DATE_LEN;
+	offLog += gLog(plogBuff+offLog,DEBUG_BUFF_MAX-offLog,"->APDU connet[%d]times[%d] sa[%d]Addr[%x,%d]\r\n",new_fd,pFd->client_times, \
+		pFd->client.sin_family,pFd->client.sin_addr.s_addr,pFd->client.sin_port);
+	{
+		char datetime[20];
+		OsGetTimeStr(datetime);
+		//---DEBUG_DATE_LEN-----
+		plogBuff[0]='\r';
+		plogBuff[1]='\n';
+		memcpy(plogBuff+2,datetime,DEBUG_DATE_LEN-2);
+	}
+	//----------------------------------------------------------------------------------------------	
+	timeout.tv_sec = 30;
+	timeout.tv_usec = 0;
+	//设置接收超时
+	setsockopt(new_fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout)); 
+	while(1)
+	{ 
+		/* recv */
+		offset = recv(new_fd, pRecvBuff, RECV_BUFF_MAX, 0); 
+		if(offset <= 0)
+		{ 
+			fprintf(stderr,"fd[%d]s recvn[%d] error:[%s]\r\n",new_fd,offset, strerror(errno)); 
+			break;
+		}
+	
+		if(offset > 2)
+		{
+			offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," APDU->sRecvBuff",(u8*)pRecvBuff,offset);
+			if(pRecvBuff[0] == 0x80)
+			{
+				SetPayWallet();
+				ret=WalletDataParseApdu(pRecvBuff,pSendBuff);
+				offLog += gLogHex(plogBuff+offLog,DEBUG_BUFF_MAX-offLog," APDU->sSendBuff",pSendBuff,ret);
+				send(new_fd, pSendBuff, ret, 0);
+			}
+			else
+			{
+				strcpy((char*)pSendBuff,"不可接收APDU");
+				send(new_fd, pSendBuff, 12, 0); 
+			}
+		}
+		else break;
+	}
+	plogBuff[offLog]='\0'; puts(plogBuff);
+	free(pBuff);
+	close(new_fd); 
+	fsync(out_fd);
+	fsync(err_fd);
+	return NULL; 
+}
 
 void* Handle_6666Sever(void* pFd)
 {
@@ -447,7 +516,7 @@ void* Handle_8888Sever(void* pFd)
 	exit( 0); 
 }
 
-void* Handle_ApduSever(void* pFd)
+void* Handle_ApduSeverRecv(void* pFd)
 {
 	/* socket->bind->listen->accept->send/recv->close*/
 	int sock_fd; 
@@ -500,7 +569,7 @@ void* Handle_ApduSever(void* pFd)
 		} 
 		tSockData.client_times++; 
 		/* send/recv */
-		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_ApduSwap,&tSockData))
+		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_ApduSwapRecv,&tSockData))
 		{
 			close(tSockData.new_fd);
 			fprintf(stderr,"pthread_create5 error:[%s]\r\n", strerror(errno)); 
@@ -511,6 +580,73 @@ void* Handle_ApduSever(void* pFd)
 	close(sock_fd); 
 	exit( 0); 
 }
+
+
+void* Handle_ApduSeverPay(void* pFd)
+{
+	/* socket->bind->listen->accept->send/recv->close*/
+	int sock_fd; 
+	struct sockaddr_in server_addr;
+	def_sockdata tSockData;
+	//struct sockaddr_in client_addr;
+	socklen_t addr_len; 
+	pthread_t threadID;
+	TRACE("Handle ApduSeverPay");
+	tSockData.client_times = 0;	
+	/* socket->bind->listen->accept->send/recv->close*/
+
+	/* socket */
+	sock_fd = socket(AF_INET, SOCK_STREAM, 0); //AF_INET:IPV4;SOCK_STREAM:TCP
+	if( -1== sock_fd) 
+	{ 
+		fprintf( stderr, "socket3 error:[%s]\r\n", strerror(errno)); 
+		exit( 81); 
+	} 
+	/* set server sockaddr_in */
+	memset(&server_addr, 0, sizeof(struct sockaddr_in)); //clear
+	server_addr.sin_family = AF_INET; 
+	server_addr.sin_addr.s_addr = htonl(INADDR_ANY); //INADDR_ANY:This machine all IP
+	server_addr.sin_port = htons(3333); 
+	/* bind */
+	if( -1== bind(sock_fd, (struct sockaddr *)(&server_addr), sizeof(server_addr))) 
+	{ 
+		fprintf( stderr,"bind3 error:[%s]\r\n", strerror(errno)); 
+		close(sock_fd); 
+		exit( 82); 
+	} 
+	/* listen */
+	if( -1 == listen(sock_fd, BACKLOG)) 
+	{ 
+		fprintf(stderr, "listen3 error:[%s]\r\n", strerror(errno)); 
+		close(sock_fd); 
+		exit( 83); 
+	} 
+
+	/* accept */
+	while( 1) 
+	{ 
+		addr_len = sizeof(struct sockaddr); 
+		tSockData.new_fd = accept(sock_fd, (struct sockaddr *)&tSockData.client, &addr_len); //(struct sockaddr *)
+		if( -1 == tSockData.new_fd) 
+		{ 
+			fprintf( stderr, "accept3 error:[%d][%s]\r\n",tSockData.client_times,strerror(errno)); 
+			close(sock_fd); 
+			exit( 84); 
+		} 
+		tSockData.client_times++; 
+		/* send/recv */
+		if(pthread_create(&threadID,NULL,(void * (*)(void *))&EXP_ApduSwapPay,&tSockData))
+		{
+			close(tSockData.new_fd);
+			fprintf(stderr,"pthread_create3 error:[%s]\r\n", strerror(errno)); 
+			continue;
+		}
+	} 
+	/* close */
+	close(sock_fd); 
+	exit( 0); 
+}
+
 
 void UI_ShowMemMsg(char* pTitle,char* pMsg,int Mpar)
 {
@@ -524,7 +660,7 @@ void UI_ShowMemMsg(char* pTitle,char* pMsg,int Mpar)
 int main(int argc, char* argv[]) 
 {
 	/* socket->bind->listen->accept->send/recv->close*/
-	pthread_t t6ID,t8ID,t5ID;
+	pthread_t t6ID,t8ID,t5ID,t3ID;
 	u32 *pMemBuff;
 	int ret;
 	{
@@ -591,8 +727,15 @@ int main(int argc, char* argv[])
 	gLoadFunAllocShowMsg(UI_ShowMemMsg);
 	WalletDataInit();
 	
-	ret=pthread_create(&t5ID,NULL,&Handle_ApduSever,NULL);
+	ret=pthread_create(&t5ID,NULL,&Handle_ApduSeverRecv,NULL);
 	TRACE("create Handle 555Sever[%d],id[%d]",ret,t5ID);
+	if(ret)
+	{
+		fprintf(stderr,"pthread5create[%d] error:[%s]\r\n",ret, strerror(errno)); 
+	}
+	
+	ret=pthread_create(&t3ID,NULL,&Handle_ApduSeverPay,NULL);
+	TRACE("create Handle 555Sever[%d],id[%d]",ret,t3ID);
 	if(ret)
 	{
 		fprintf(stderr,"pthread5create[%d] error:[%s]\r\n",ret, strerror(errno)); 
@@ -602,6 +745,8 @@ int main(int argc, char* argv[])
 	pthread_join(t8ID, NULL);
 	pthread_join(t6ID, NULL);
 	pthread_join(t5ID, NULL);
+	pthread_join(t3ID, NULL);
+	
 	free(pMemBuff);
 	TRACE("\r\n>>>>>>>sever main Handle out<<<<<<\r\n",ret,t8ID);
 	if (err_fd != -1) close(err_fd);

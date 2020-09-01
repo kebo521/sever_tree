@@ -24,6 +24,17 @@ void SetCurrWallet(DfHeadInfo* p)
 	pWallet=p;
 }
 
+void SetRecvWallet(void)
+{
+	pWallet=pRecvWallet;
+}
+
+void SetPayWallet(void)
+{
+	pWallet=pPayWallet;
+}
+
+
 int Test_CreateDc(DfDC_bt* pDc,u8* pOwnerID,u32 amont)
 {
 	pDc->tag=0x72;
