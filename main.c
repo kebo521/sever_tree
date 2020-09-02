@@ -726,6 +726,7 @@ int main(int argc, char* argv[])
 	pMemBuff= (u32 *)malloc(16*1024);
 	gMemAllocInit(pMemBuff,16*1024,4);
 	gLoadFunAllocShowMsg(UI_ShowMemMsg);
+	SPI_Flash_init();
 	api_gFileInit();
 	WalletDataInit();
 	
