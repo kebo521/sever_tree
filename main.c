@@ -35,6 +35,7 @@
 //#include "voucher.h"
 
 //#include "Wallet.h"
+#include "gfs_api.h"
 
 
 #define PORT_NUMBER 	8888
@@ -725,6 +726,7 @@ int main(int argc, char* argv[])
 	pMemBuff= (u32 *)malloc(16*1024);
 	gMemAllocInit(pMemBuff,16*1024,4);
 	gLoadFunAllocShowMsg(UI_ShowMemMsg);
+	api_gFileInit();
 	WalletDataInit();
 	
 	ret=pthread_create(&t5ID,NULL,&Handle_ApduSeverRecv,NULL);

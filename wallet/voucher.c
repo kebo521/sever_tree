@@ -123,6 +123,8 @@ int InDcVerify(DfDC_bt* pDc)
 	SM2_PRIVKEY *pKey=NULL;
 	if(pDc->tag != 0x72) 
 		return -4;
+	if(pDc->dc.deTag != 0x44) 
+		return -4;	
 	//---------验证币串--------------
 	//pKey	//取人行公钥
 	offset = pDc->dc.PbcSign - &pDc->dc.veTag;

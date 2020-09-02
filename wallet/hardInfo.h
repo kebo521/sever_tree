@@ -138,18 +138,18 @@ typedef struct
 	u8 isTag;		//0x46
 	u8 isLen;		//6
 	u8 IssuerTime[6];			//发行时间ID TAG=0x46 (Unix时间戳，精确到ms)
-	u8 prTag;		//0x47
-	u8 prLen;		//70
-	u8 PbcReserved[70];			//人民银行保留域ID TAG=0x47
+	//u8 prTag;		//0x47
+	//u8 prLen;		//70
+	//u8 PbcReserved[7];			//人民银行保留域ID TAG=0x47
 	u8 psTag;		//0x48
 	u8 psLen;		//64
 	u8 PbcSign[64];				//人民银行签名ID TAG=0x48
 	u8 owTag;		//0x49
 	u8 owLen;		//64
 	u8 OwnerID[64];				//所有者标志ID TAG=0x49	(所有者公钥)
-	u8 irTag;		//0x4a
-	u8 irLen;		//70
-	u8 InstructingPartyReserved[70];//运营机构保留域ID TAG=0x4A	
+	//u8 irTag;		//0x4a
+	//u8 irLen;		//70
+	//u8 InstructingPartyReserved[7];//运营机构保留域ID TAG=0x4A	
 	u8 ipTag;		//0x4b
 	u8 ipLen;		//64
 	u8 InstructingPartySign[64];	//运营机构签名ID TAG=0x4B	

@@ -43,7 +43,7 @@ void WalletDataInit(void)
 {
 	//gfs_Fomat("123456");
 	#ifdef WALLET_TEST_DATA
-	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x01","证通01收款硬钱包","收款证书",654321);
+	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x01","证通01收款硬钱包","收款证书",654327);
 	pRecvWallet=GetCurrWallet();
 	SetCurrWallet(NULL);
 	Test_CreateWallet((u8*)"\x00\x00\x00\x00\x00\x00\x00\x02","证通02付款硬钱包","付款证书",80000);

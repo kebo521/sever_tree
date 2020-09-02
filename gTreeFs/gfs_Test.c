@@ -646,7 +646,7 @@ EXP_UNIT* EXP_FileSysAutoTest(EXP_UNIT* pInPar)
 			for(si=0;si<sMax;si++)
 			{
 				SaveLen =rand() % MAX_SAVE_TREM_LEN;
-				if(SaveLen <= 0 &&(SaveLen&0x03)) continue;
+				if((SaveLen <= 0) || (SaveLen&0x03)) continue;
 				if((offset+SaveLen) >= MAX_SAVE_FILE_LEN)
 				{
 					//TRACE("gfs_open[%s] getData[%d]Err",tfileArr[fIndex].sName,SaveLen);
