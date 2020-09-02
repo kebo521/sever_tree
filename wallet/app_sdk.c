@@ -87,7 +87,7 @@ ALG_STATUS sm2_decrypt(UINT8 *prvkey,UINT8 *Crypto,UINT32 CryptoLen,UINT8 *Messa
 void api_rand(u32 *pRng,int num)
 {
 	while(num--)
-		*pRng++ = rand();
+		*pRng++ = (rand()<<16)|rand();
 }
 
 int api_sm_sign2(u8 *prvkey,u8 *pIn,int len,u8* pOutSign)

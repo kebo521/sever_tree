@@ -6,6 +6,10 @@
 #define _HARD_INFO_
 //#include "ks_type.h"
 
+#define WALLET_TEST_FAT
+#define		RANDAB_LEN		4
+#define		FATAB_LEN		16	// 16 + 96
+
 //============================系统控制信息=====================
 typedef struct
 {
@@ -204,7 +208,6 @@ typedef struct
 	u8 PayTag;			//0x63		
 	u8 PayLen[3];		//0x82 xx xx
 	DfDC_bt tDc;		//DC币串 TAG=0x72
-	u8 SubChainNun;		//子链数量
 	u8 ChainTag;		//0x60		
 	u8 ChainLen[0];		//0x82 169
 //	DfTranSubChain tranChain[0];	//DCDC交易链 TAG=0x60
@@ -313,7 +316,7 @@ typedef struct
 typedef struct
 {
 	u8 					Enc[16];	//加密密钥
-	char 				Mac[16];	//Mac密钥
+	u8 					Mac[16];	//Mac密钥
 }DfSessionKey;		//交易会话密钥
 
 typedef struct
@@ -438,7 +441,7 @@ typedef struct
 typedef struct
 {
 	u8 					amount[6];		//交易金额（6字节）
-	u8 					RandB[8];		//付款方随机数（4字节）
+	u8 					RandB[RANDAB_LEN];		//付款方随机数（4字节）
 	u8 					TimeStamp[6];	//时间戳 （6字节）
 	u8 					CertChainB[];	//付款方证书连 (运营机构交易证书 + 硬件钱包交易证书)
 }DfRecviveInit;		
@@ -446,8 +449,8 @@ typedef struct
 typedef struct
 {
 	u8 					wallAmount[6];
-	u8 					ATC[2];			//硬件钱包交易计数器
-	u8 					RandA[8];		//收款方随机数（4字节）
+	u8 					ATC[4];			//硬件钱包交易计数器
+	u8 					RandA[RANDAB_LEN];		//收款方随机数（4字节）
 	u8 					CertChainA[];	//收款方证书连 (运营机构交易证书 + 硬件钱包交易证书)
 	//u8 					FactA[16+96];	//收款方会话因子
 	//u8 					SigA[64];		//签名A
@@ -456,7 +459,7 @@ typedef struct
 
 typedef struct
 {
-	u8					RandB[8];		//付款方随机数（4字节）
+	u8					RandB[RANDAB_LEN];		//付款方随机数（4字节）
 	u8					CertChainB[];	//付款方证书连 (运营机构交易证书 + 硬件钱包交易证书)
 	//u8					FactB[16];		//用于生成会话密钥的因子		
 	//u8					sign[64];	//签名数据
@@ -464,7 +467,7 @@ typedef struct
 
 typedef struct
 {
-	u8					FactA[16];		//用于生成会话密钥的因子
+	u8 					FactA[FATAB_LEN];	//用于生成会话密钥的因子
 	PaymentVoucher		payVou; 		//DCEP币串和交易子链=支出凭证
 	//u8					MAC1[4];		//
 }DfPaymentResO;
@@ -473,8 +476,8 @@ typedef struct
 
 typedef struct
 {
-	u8 					FactB[16+96];	//付款方会话因子
-	u8 					PaymentVoucher[];	//支出凭证(ASN1 结构)
+	u8					FactB[FATAB_LEN];	//付款方会话因子 不加密
+	PaymentVoucher 		PayVoucher;			//支出凭证(ASN1 结构)
 	//u8 					MAC1[4];
 }DfRecviveOperation;		
 

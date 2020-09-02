@@ -111,6 +111,8 @@ int ReadPaymentVoucher(uBalVoucher* pBal,TransSubChain* pCurrSun,PaymentVoucher*
 	pPayment ->PayLen[0] = 0x82;
 	pPayment ->PayLen[1] =max/0x100;
 	pPayment ->PayLen[2] =max&0xff;
+	//-----------¿½±´±Ò´®--------------------
+	memcpy(&pPayment->tDc,&pBal->tDc,sizeof(pPayment->tDc));
 	return ((u8*)&pSubChain[i+1] - (u8*)pPayment);
 }
 
@@ -322,9 +324,9 @@ int ReadPubKeyCert(u8* pWalletID,CERT_TYPE type,u8 *pCert,int size)
 	CertKey *CertAll;
 	int ret;
 	CertAll = (CertKey *)gMalloc(sizeof(CertKey));
-	if(CertAll==NULL)
+	if(CertAll == NULL)
 	{
-		*pCert++ = 0x31;
+		*pCert++ = 0x05;
 		*pCert++ = 0x00;
 		return 2;
 	}
@@ -364,7 +366,7 @@ int ReadPubKeyCert(u8* pWalletID,CERT_TYPE type,u8 *pCert,int size)
 	}
 	if(ret <= 0)
 	{
-		*pCert++ = 0x30;
+		*pCert++ = 0x05;
 		*pCert++ = 0x00;
 		ret = 2;
 	}

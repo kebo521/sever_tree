@@ -1062,6 +1062,12 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 {
 	u8* pDataRet=pOut;
 	int inlen=pAPDU->lc[0]*256 + pAPDU->lc[1];
+	if(pAPDU->cla != 0x80 || inlen > 1024)
+	{
+		*pOut++ = 0x82;
+		*pOut++ = 0x05;
+		return 2;
+	}
 	switch(pAPDU->ins)
 	{
 		case 0x41:	//创建钱包
@@ -1513,73 +1519,6 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 				}
 			}
 			break;
-		/*
-		case 0x06://交易付款
-			{
-				u32 Amount;
-				int index;
-				//u8 RandB[8];				
-				uPaymentApp *pInBack;
-				uWalletFD* pFd;
-				pFd=gGetWalletPfd(0);
-				if(pFd)
-				{
-					pInBack = (uPaymentApp *)pAPDU->data;
-					Amount=Conv_Hex8ToNum(pInBack->amount,6);
-					if(Amount <= pFd->pRealizeInfo->uAvailableBal)
-					{
-						index=CheckVoucherAmount(pFd->pWallet,Amount);
-						if(index >= 0)
-						{
-							int outLen;
-							TransSubChain tTransSub;
-							uBalVoucher *pBal;
-							
-
-							tTransSub.aTag =0x51;
-							tTransSub.aLen =sizeof(tTransSub.Amount);
-							Conv_NumToDecimal(Amount,tTransSub.Amount,sizeof(tTransSub.Amount));
-							
-							tTransSub.tTag =0x52;
-							tTransSub.tLen =sizeof(tTransSub.Amount);
-							//Conv_NumToDecimal(Amount,tTransSub.TransactionIndex,sizeof(tTransSub.Amount));
-
-							tTransSub.cTag =0x53;
-							tTransSub.cLen =sizeof(tTransSub.CreditorPubKey);
-							memcpy(tTransSub.CreditorPubKey,pInBack->PubKey,tTransSub.cLen);
-							
-							tTransSub.dTag =0x54;
-							tTransSub.dLen =sizeof(tTransSub.DebtorSign);
-							pBal=ReadBalVoucher(GetWalletName(index,pFd->WalletID));
-							if(TransSubChainSign(pFd->pKey,pBal,&tTransSub))
-							{
-								gFree(pBal);
-								break;
-							}
-							pFd->pWallet->dc[index].InvVoucherBal -= ~((~pFd->pWallet->dc[index].InvVoucherBal) -Amount);
-							//-------------Return-------------------------------------
-
-							*pDataRet++= 0;
-							outLen=ReadPaymentVoucher(pBal,&tTransSub,pDataRet);
-							gFree(pBal);
-							pDataRet += outLen;
-							outLen=ReadPubKeyCert(pFd->WalletID,CERT_INS,pDataRet,256);
-							pDataRet += outLen;
-						}
-						//TransSubChainSign
-					}
-					else	//-------余额不够-----------
-					{
-
-					}
-				}					
-
-				*pDataRet++= 0;
-				*pDataRet++= 0;
-			}
-
-			break;
-			*/
 		case 0x60://初始化离线收款
 		{
 				int 	ret;
@@ -1607,16 +1546,30 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						pInBack = (DfRecviveInit *)pAPDU->data;
 						//------------解析验证证书-----------------
 						{
+							//-------运营机构交易证书-----------
+							#ifdef WALLET_TEST_DATA
+							pPuKey=(SM2_PUBKEY *)WALLET_TEST_DATA;
+							#else
 							u16 len;
 							u8 *pCert =pInBack->CertChainB;
-							//-------运营机构交易证书-----------
 							if(*pCert == 0x30) pCert++;
 							parse_asn1_len(len,pCert);
-						
+							if(len > 256)
+							{
+								*pDataRet++= 0x51;
+								*pDataRet++= 0x01;
+								break;
+							}
 							pCert += len;
 							//-------硬件钱包交易证书----------
 							if(*pCert == 0x30) pCert++;
 							parse_asn1_len(len,pCert);
+							if(len > 256)
+							{
+								*pDataRet++= 0x51;
+								*pDataRet++= 0x02;
+								break;
+							}
 							//06 08 2a 81 1c cf 55 01 82 2d
 							pCert=eMemseek(pCert,len,(u8*)"\x06\x08\x2a\x81\x1c\xcf\x55\x01\x82\x2d",10);
 							if(pCert)
@@ -1629,10 +1582,9 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 									pPuKey = (SM2_PUBKEY *)pCert;
 								}
 							}
+							#endif
 						}
-						#ifdef WALLET_TEST_DATA
-							pPuKey=(SM2_PUBKEY *)WALLET_TEST_DATA;
-						#endif
+						
 						if(pPuKey == NULL) break;
 						pFd->Amount=Conv_Hex4ToNum(pInBack->amount,sizeof(pInBack->amount));
 						memcpy(pFd->TimeStamp,pInBack->TimeStamp,sizeof(pFd->TimeStamp));
@@ -1643,7 +1595,7 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						api_rand(pFd->FactA,sizeof(pFd->FactA)/4);	//4*4 =16
 						
 						Conv_NumToHex(pFd->pRealizeInfo->uATC,pOutResI->ATC,sizeof(pOutResI->ATC));
-						Conv_NumToHex(pFd->pRealizeInfo->uAvailableBal,pOutResI->wallAmount,sizeof(pOutResI->wallAmount));
+						Conv_NumToHex(pFd->pRealizeInfo->VoucherBal[0],pOutResI->wallAmount,sizeof(pOutResI->wallAmount));
 						
 						memcpy(pOutResI->RandA,pFd->RandA,sizeof(pOutResI->RandA));
 						p = pOutResI->CertChainA;
@@ -1653,8 +1605,12 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						ret=ReadPubKeyCert(pFd->WalletID,CERT_PERS,p,256);
 						p += ret;
 						//-------------FactA------------------------------------
-						memcpy(p,pFd->FactA,16);
-						sm2_encrypt((u8*)pPuKey,(u8*)pFd->FactA,16,p,&outLen);
+						memcpy(p,pFd->FactA,sizeof(pFd->FactA));
+						#ifdef WALLET_TEST_DATA
+						outLen = sizeof(pFd->FactA);
+						#else
+						sm2_encrypt((u8*)pPuKey,(u8*)pFd->FactA,sizeof(pFd->FactA),p,&outLen);
+						#endif
 						p += outLen;
 						//--------------Signature---------------------
 						api_sm_sign2(pFd->pKey->d,pDataRet,p-pDataRet,p);
@@ -1667,8 +1623,24 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						DfPaymentResI *pOutResI;
 						pInBack = (DfPaymentInit *)pAPDU->data;
 						pFd->Amount=Conv_Hex4ToNum(pInBack->amount,sizeof(pInBack->amount));
+						if(pFd->Amount > pFd->pRealizeInfo->uAvailableBal)
+						{
+							strcpy((char*)pDataRet,"没有足够的余额用于本次支付");
+							pDataRet += 64;
+							*pDataRet++= 0x81;
+							*pDataRet++= 0x01;
+							break;
+						}
+						pFd->index = CheckVoucherAmount(pFd->pRealizeInfo,pFd->Amount);
+						if(pFd->index < 0)
+						{
+							strcpy((char*)pDataRet,"单个币不足以支付本次交易");
+							pDataRet += 64;
+							*pDataRet++= 0x81;
+							*pDataRet++= 0x02;
+							break;
+						}
 						memcpy(pFd->TimeStamp,pInBack->TimeStamp,sizeof(pInBack->TimeStamp));
-
 						pOutResI =(DfPaymentResI *)pDataRet;
 						api_rand(pFd->RandA,sizeof(pFd->RandA)/4); //1*4 =4
 						memcpy(pOutResI->Random,pFd->RandA,sizeof(pOutResI->Random));
@@ -1699,9 +1671,12 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 				{
 					u8 skeyBuff[40];
 					pInBack = (DfRecviveOperation *)pAPDU->data;
-					
 					//------------解析验证证书-----------------
+					#if(FATAB_LEN == 16)
+					memcpy(pFd->FactB,pInBack->FactB,sizeof(pFd->FactB));
+					#else
 					sm2_decrypt(pFd->pKey->d,pInBack->FactB,sizeof(pInBack->FactB),(u8*)pFd->FactB,&outLen);
+					#endif
 					p = skeyBuff;
 					Conv_buffXor(p,(u8*)pFd->FactA,(u8*)pFd->FactB,sizeof(pFd->FactB));
 					p += sizeof(pFd->FactB);
@@ -1709,84 +1684,62 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 					Conv_buffXor(p,(u8*)pFd->RandA,(u8*)pFd->RandB,sizeof(pFd->RandB));
 					p += sizeof(pFd->RandB);
 					api_md_hash(MODE_SM3,skeyBuff,p-skeyBuff,(u8*)&pFd->sesKey);	//得到会话密钥
-					inlen -= sizeof(DfRecviveOperation);
+					inlen -= sizeof(pInBack->FactB);
 					if(inlen > 0)
 					{
-						//PaymentVoucher *pPay;
-						//pPaymentVoucher = gMalloc(inlen);
-						//memcpy(pPaymentVoucher,pInBack->PaymentVoucher,inlen);
-						/*
-						sm4_en_de_crypt(ALG_DECRYPT,ALG_CBC,ALG_COFBIT_DUMMY,
-											(UINT32 *)pPaymentVoucher,
-											(UINT32 *)pPaymentVoucher,
-											inlen,
-											pFd->sesKey.Enc,
-											NULL,
-											0,	 //false
-											0,	 //false
-											1	 //true
-											);
-						
-						outLen=pPaymentVoucher[0]*256 + pPaymentVoucher[1];
-						pPay = (PaymentVoucher *)(pPaymentVoucher+2);
-						ret = PaymentVoucherVerify(pPay,outLen);
-						*/
-						p = pInBack->PaymentVoucher;
-						//if(ret >= 0)
+						u32 Amount;
+						uBalVoucher *pBal;
+						pBal=PaymentToBalVouche((PaymentVoucher *)&pInBack->PayVoucher,&outLen,&Amount);
+						if(pBal == NULL)
 						{
-							u32 Amount;
-							uBalVoucher *pBal;
-							pBal=PaymentToBalVouche((PaymentVoucher *)p,&outLen,&Amount);
-							if(pBal == NULL)
-							{
-								*pDataRet++= 0x51;
-								*pDataRet++= 0x02;
-								break;
-							}
-							//-------检查金额---------------------
-							if(Amount != pFd->Amount)
-							{
-								*pDataRet++= 0x51;
-								*pDataRet++= 0x02;
-								break;
-							}
-							if((outLen+4) > inlen)
-							{
-								*pDataRet++= 0x51;
-								*pDataRet++= 0x02;
-								break;
-							}
-							p += outLen;
-							//------------MAC1------------------------
-							SaveBalVoucher(GetWalletName(pFd->index,pFd->WalletID),pBal);
-							gFree(pBal);
-							pFd->pRealizeInfo->VoucherBal[pFd->index] = Amount;
-							pFd->pRealizeInfo->uBal += Amount;
-							pFd->pRealizeInfo->uAvailableBal += Amount;
-							pFd->pRealizeInfo->uOffTranAmt += Amount;
-
-							pFd->pRealizeInfo->uDayPayAmt += Amount;
-							pFd->pRealizeInfo->uMonthPayAmt += Amount;
-							pFd->pRealizeInfo->uYearPayAmt += Amount;
-							pFd->pRealizeInfo->uATC++;
-							//----存交易流水------------
-							{
-								DfTransactionBill* pbill;
-								pbill = (DfTransactionBill*)gMalloc(sizeof(DfTransactionBill)+256);
-								Conv_NumToDecimal(Amount,pbill->tBill.Amount,sizeof(pbill->tBill.Amount));
-								memcpy(pbill->tBill.TransactionType,pFd->TransType,sizeof(pbill->tBill.TransactionType));
-								memcpy(pbill->tBill.TransactionType,pFd->TransType,sizeof(pbill->tBill.TransactionType));
-								//SaveTransactionBill(GetWalletName(  ,pFd->WalletID),DfTransactionBill *pBill,int blen)
-								gFree(pbill);
-							}
-							//------MAC2---------------------
-							*pDataRet++= 0;
-							*pDataRet++= 0;
-							*pDataRet++= 0;
-							*pDataRet++= 0;
-							*pDataRet++= 0x90;	//SW1
-							*pDataRet++= 0x00;  //SW2
+							*pDataRet++= 0x51;
+							*pDataRet++= 0x02;
+							break;
 						}
+						TRACE("outLen=%d,inlen=%d\n",outLen,inlen);
+						//-------检查金额---------------------
+						if(Amount != pFd->Amount)
+						{
+							*pDataRet++= 0x51;
+							*pDataRet++= 0x03;
+							break;
+						}
+						if((outLen+4) > inlen)
+						{
+							*pDataRet++= 0x51;
+							*pDataRet++= 0x04;
+							break;
+						}
+						p = (u8*)&pInBack->PayVoucher + outLen;
+						//------------MAC1------------------------
+						SaveBalVoucher(GetWalletName(pFd->index,pFd->WalletID),pBal);
+						gFree(pBal);
+						pFd->pRealizeInfo->VoucherBal[pFd->index] = Amount;
+						pFd->pRealizeInfo->uBal += Amount;
+						pFd->pRealizeInfo->uAvailableBal += Amount;
+						pFd->pRealizeInfo->uOffTranAmt += Amount;
+
+						pFd->pRealizeInfo->uDayPayAmt += Amount;
+						pFd->pRealizeInfo->uMonthPayAmt += Amount;
+						pFd->pRealizeInfo->uYearPayAmt += Amount;
+						pFd->pRealizeInfo->uATC++;
+						//----存交易流水------------
+						{
+							DfTransactionBill* pbill;
+							pbill = (DfTransactionBill*)gMalloc(sizeof(DfTransactionBill)+256);
+							Conv_NumToDecimal(Amount,pbill->tBill.Amount,sizeof(pbill->tBill.Amount));
+							memcpy(pbill->tBill.TransactionType,pFd->TransType,sizeof(pbill->tBill.TransactionType));
+							memcpy(pbill->tBill.TransactionType,pFd->TransType,sizeof(pbill->tBill.TransactionType));
+							//SaveTransactionBill(GetWalletName(  ,pFd->WalletID),DfTransactionBill *pBill,int blen)
+							gFree(pbill);
+						}
+						//------MAC2---------------------
+						*pDataRet++= 0;
+						*pDataRet++= 0;
+						*pDataRet++= 0;
+						*pDataRet++= 0;
+						*pDataRet++= 0x90;	//SW1
+						*pDataRet++= 0x00;  //SW2
 						//gFree(pPaymentVoucher);
 					}
 
@@ -1836,14 +1789,18 @@ int WalletDataParseApdu(DC_APDU *pAPDU,u8 *pOut)
 						}
 					}
 					pCert += len;
+					#ifdef WALLET_TEST_DATA
+					if(pPuKey==NULL)
+						pPuKey=(SM2_PUBKEY *)WALLET_TEST_DATA;
+					#endif
 					//-------------FAT----------------------
 					memcpy((u8*)pFd->FactB,pCert,sizeof(pFd->FactB));
 					pCert += sizeof(pFd->FactB);
-					#ifdef WALLET_TEST_DATA
-						pPuKey=(SM2_PUBKEY *)WALLET_TEST_DATA;
-					#endif
 					//-----------sign[64]---------------------------
-					if(pPuKey == NULL)
+					TRACE("pPuKey[%x]\n",pPuKey);
+
+					//-----------------------------------------------
+					if(pPuKey)
 					{
 						int outLen;
 						TransSubChain tTransSub;
